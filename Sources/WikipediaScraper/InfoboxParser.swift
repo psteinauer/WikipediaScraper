@@ -210,8 +210,14 @@ struct InfoboxParser {
                 pos.startDate = start
                 pos.endDate   = end
             }
-            pos.predecessor = fields["predecessor\(suffix)"].flatMap { cleanText($0) }
-            pos.successor   = fields["successor\(suffix)"].flatMap { cleanText($0) }
+            if let raw = fields["predecessor\(suffix)"] {
+                pos.predecessor = cleanText(raw)
+                pos.predecessorWikiTitle = extractWikiTitle(from: raw)
+            }
+            if let raw = fields["successor\(suffix)"] {
+                pos.successor = cleanText(raw)
+                pos.successorWikiTitle = extractWikiTitle(from: raw)
+            }
             person.titledPositions.append(pos)
 
             // Coronation as custom event
@@ -240,10 +246,14 @@ struct InfoboxParser {
             var pos = TitledPosition(title: offTitle)
             if let ts = fields["term_start\(suffix)"] { pos.startDate = DateParser.parse(ts) }
             if let te = fields["term_end\(suffix)"]   { pos.endDate   = DateParser.parse(te) }
-            pos.predecessor = (fields["preceded_by\(suffix)"] ?? fields["predecessor\(suffix)"])
-                                .flatMap { cleanText($0) }
-            pos.successor   = (fields["succeeded_by\(suffix)"] ?? fields["successor\(suffix)"])
-                                .flatMap { cleanText($0) }
+            if let raw = fields["preceded_by\(suffix)"] ?? fields["predecessor\(suffix)"] {
+                pos.predecessor = cleanText(raw)
+                pos.predecessorWikiTitle = extractWikiTitle(from: raw)
+            }
+            if let raw = fields["succeeded_by\(suffix)"] ?? fields["successor\(suffix)"] {
+                pos.successor = cleanText(raw)
+                pos.successorWikiTitle = extractWikiTitle(from: raw)
+            }
             person.titledPositions.append(pos)
         }
 

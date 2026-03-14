@@ -268,6 +268,10 @@ struct WikipediaScraper: AsyncParsableCommand {
                 if let wt = person.father?.wikiTitle { toFetch.insert(wt) }
                 if let wt = person.mother?.wikiTitle { toFetch.insert(wt) }
                 for pr in person.parents   { if let wt = pr.wikiTitle  { toFetch.insert(wt) } }
+                for pos in person.titledPositions {
+                    if let wt = pos.predecessorWikiTitle { toFetch.insert(wt) }
+                    if let wt = pos.successorWikiTitle   { toFetch.insert(wt) }
+                }
             }
             toFetch.subtract(fetchedTitles)
 

@@ -43,13 +43,15 @@ struct PersonEvent {
 
 // A titled position held for a period (maps to GEDCOM TITL with DATE FROM…TO)
 struct TitledPosition {
-    var title:       String
-    var startDate:   GEDCOMDate?
-    var endDate:     GEDCOMDate?
-    var place:       String?      // capital / court / location of office
-    var predecessor: String?
-    var successor:   String?
-    var note:        String?
+    var title:                String
+    var startDate:            GEDCOMDate?
+    var endDate:              GEDCOMDate?
+    var place:                String?      // capital / court / location of office
+    var predecessor:          String?
+    var predecessorWikiTitle: String?      // Wikipedia article title for linking
+    var successor:            String?
+    var successorWikiTitle:   String?      // Wikipedia article title for linking
+    var note:                 String?
 }
 
 // A custom named event (maps to GEDCOM EVEN with TYPE)

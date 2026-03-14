@@ -164,18 +164,29 @@ private struct BuildContext {
         }
 
         // Predecessors and successors → ASSO (influential persons)
-        var seenNames: [String: String] = [:]
+        var seenAssoc: [String: String] = [:]   // dedup key → indiID
         for pos in person.titledPositions {
-            for (name, rela) in [(pos.predecessor, "Predecessor"),
-                                 (pos.successor,   "Successor")] {
-                guard let n = name, !n.isEmpty else { continue }
-                if seenNames[n] == nil {
-                    seenNames[n] = "@I\(nextI)@"; nextI += 1
-                    assocStubs.append(AssocStub(indiID: seenNames[n]!, name: n))
+            let pairs: [(name: String?, wikiTitle: String?, rela: String)] = [
+                (pos.predecessor, pos.predecessorWikiTitle, "Predecessor"),
+                (pos.successor,   pos.successorWikiTitle,   "Successor"),
+            ]
+            for pair in pairs {
+                guard let n = pair.name, !n.isEmpty else { continue }
+                let key = pair.wikiTitle ?? n
+                let indiID: String
+                if let wt = pair.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
+                    // This person is already a full INDI — no stub needed
+                    indiID = id
+                } else if let id = seenAssoc[key] {
+                    indiID = id
+                } else {
+                    indiID = "@I\(nextI)@"; nextI += 1
+                    seenAssoc[key] = indiID
+                    assocStubs.append(AssocStub(indiID: indiID, name: n))
                 }
                 assocLinks.append(AssocLink(
-                    indiID: seenNames[n]!,
-                    rela:   rela,
+                    indiID: indiID,
+                    rela:   pair.rela,
                     note:   pos.title.isEmpty ? nil : "as \(pos.title)"))
             }
         }
@@ -299,44 +310,32 @@ struct GEDCOMBuilder {
         let given = person.givenName ?? ""
         let surn  = person.surname   ?? ""
 
-        // 1. Primary name — Wikipedia article title
-        //    Falls back to infobox name if wikiTitle is not set.
-        let primaryName = person.wikiTitle ?? person.name ?? ""
-        if !primaryName.isEmpty {
-            line(1, "NAME \(primaryName)")
-            // GIVN / SURN from infobox if available; otherwise split the title
-            if !given.isEmpty || !surn.isEmpty {
-                if !given.isEmpty { line(2, "GIVN \(given)") }
-                if !surn.isEmpty  { line(2, "SURN \(surn)") }
-            } else {
-                let (g, s) = splitGivenSurname(primaryName)
-                if !g.isEmpty { line(2, "GIVN \(g)") }
-                if !s.isEmpty { line(2, "SURN \(s)") }
-            }
-        }
-
-        // 2. Infobox-structured name as additional NAME (if different from primary)
-        //    Formatted as "Given /Surname/" for genealogy-app indexing.
-        let infoName: String?
-        if !given.isEmpty && !surn.isEmpty {
-            infoName = "\(given) /\(surn)/"
-        } else if !given.isEmpty {
-            infoName = given
-        } else if !surn.isEmpty {
-            infoName = "/\(surn)/"
-        } else {
-            infoName = person.name
-        }
-        if let inf = infoName, !inf.isEmpty,
-           normaliseName(inf) != normaliseName(primaryName) {
-            line(1, "NAME \(inf)")
+        // 1. Primary name — always the Wikipedia article title (or infobox name).
+        //    Detect an honorific prefix (e.g. "Queen") when wikiTitle ends with
+        //    the structured given+surname core, and emit it as NPFX.
+        let wikiName = person.wikiTitle ?? person.name ?? ""
+        let (nameValue, npfx) = buildPrimaryName(wikiTitle: wikiName, given: given, surname: surn)
+        if !nameValue.isEmpty {
+            line(1, "NAME \(nameValue)")
+            if !npfx.isEmpty  { line(2, "NPFX \(npfx)") }
             if !given.isEmpty { line(2, "GIVN \(given)") }
             if !surn.isEmpty  { line(2, "SURN \(surn)") }
         }
 
+        // 2. Structured "Given /Surname/" secondary NAME (only if both components
+        //    exist and differ from the primary name after normalisation).
+        if !given.isEmpty, !surn.isEmpty {
+            let structured = "\(given) /\(surn)/"
+            if normaliseName(structured) != normaliseName(nameValue) {
+                line(1, "NAME \(structured)")
+                line(2, "GIVN \(given)")
+                line(2, "SURN \(surn)")
+            }
+        }
+
         // 3. Birth name
         if let bn = person.birthName, !bn.isEmpty,
-           normaliseName(bn) != normaliseName(primaryName) {
+           normaliseName(bn) != normaliseName(nameValue) {
             line(1, "NAME \(bn)")
             line(2, "TYPE birth")
         }
@@ -712,6 +711,44 @@ struct GEDCOMBuilder {
     }
 
     // MARK: Name helpers
+
+    /// Detect an honorific prefix by checking whether `wikiTitle` ends with the
+    /// structured core (given + surname).  Returns the name value to use for the
+    /// primary NAME record and the NPFX string (empty when no prefix detected).
+    ///
+    /// Examples
+    ///   wikiTitle="Queen Victoria"  given="Victoria" surname=""
+    ///     → nameValue="Queen Victoria"  npfx="Queen"
+    ///   wikiTitle="George Washington" given="George" surname="Washington"
+    ///     → nameValue="George /Washington/"  npfx=""
+    ///   wikiTitle="Napoleon"  given="Napoleon"  surname="Bonaparte"
+    ///     → nameValue="Napoleon"  npfx=""
+    private func buildPrimaryName(wikiTitle: String, given: String, surname: String)
+        -> (nameValue: String, npfx: String) {
+        let core = [given, surname].filter { !$0.isEmpty }.joined(separator: " ")
+        var npfx = ""
+        if !core.isEmpty, wikiTitle.hasSuffix(core) {
+            let candidate = String(wikiTitle.prefix(wikiTitle.count - core.count))
+                .trimmingCharacters(in: .whitespaces)
+            if !candidate.isEmpty { npfx = candidate }
+        }
+        let nameValue: String
+        if !npfx.isEmpty {
+            // Prefix detected — use full wikiTitle as-is ("Queen Victoria")
+            nameValue = wikiTitle
+        } else if !given.isEmpty, !surname.isEmpty {
+            // Normal structured form ("George /Washington/")
+            nameValue = "\(given) /\(surname)/"
+        } else if !surname.isEmpty {
+            nameValue = "/\(surname)/"
+        } else if !given.isEmpty {
+            // Given only — prefer the richer wikiTitle when it differs
+            nameValue = wikiTitle.isEmpty ? given : wikiTitle
+        } else {
+            nameValue = wikiTitle
+        }
+        return (nameValue, npfx)
+    }
 
     private func splitGivenSurname(_ name: String) -> (String, String) {
         if let s = name.firstIndex(of: "/"), let e = name.lastIndex(of: "/"), s != e {
