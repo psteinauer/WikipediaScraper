@@ -2,25 +2,25 @@
 
 import Foundation
 
-struct WikipediaSummary: Decodable {
-    let title: String
-    let extract: String?
-    let thumbnail: Thumbnail?
-    let originalimage: Thumbnail?
+public struct WikipediaSummary: Decodable {
+    public let title: String
+    public let extract: String?
+    public let thumbnail: Thumbnail?
+    public let originalimage: Thumbnail?
 
-    struct Thumbnail: Decodable {
-        let source: String
-        let width: Int?
-        let height: Int?
+    public struct Thumbnail: Decodable {
+        public let source: String
+        public let width: Int?
+        public let height: Int?
     }
 }
 
-struct WikipediaClient {
+public struct WikipediaClient {
 
     // MARK: - Public API
 
     /// Fetch summary (thumbnail URL, extract) from REST API
-    static func fetchSummary(pageTitle: String, verbose: Bool) async throws -> WikipediaSummary {
+    public static func fetchSummary(pageTitle: String, verbose: Bool) async throws -> WikipediaSummary {
         let encoded = pageTitle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? pageTitle
         let urlStr = "https://en.wikipedia.org/api/rest_v1/page/summary/\(encoded)"
         guard let url = URL(string: urlStr) else { throw ScraperError.invalidURL(urlStr) }
@@ -31,7 +31,7 @@ struct WikipediaClient {
     }
 
     /// Fetch raw wikitext via MediaWiki action API
-    static func fetchWikitext(pageTitle: String, verbose: Bool) async throws -> String {
+    public static func fetchWikitext(pageTitle: String, verbose: Bool) async throws -> String {
         var components = URLComponents(string: "https://en.wikipedia.org/w/api.php")!
         components.queryItems = [
             URLQueryItem(name: "action", value: "query"),
@@ -64,7 +64,7 @@ struct WikipediaClient {
     }
 
     /// Resolve page title from a Wikipedia URL
-    static func pageTitle(from urlString: String) throws -> String {
+    public static func pageTitle(from urlString: String) throws -> String {
         guard let url = URL(string: urlString) else { throw ScraperError.invalidURL(urlString) }
         let path = url.path  // e.g. /wiki/George_Washington
         guard path.hasPrefix("/wiki/") else { throw ScraperError.invalidURL("URL must be a Wikipedia article: \(urlString)") }
@@ -75,7 +75,7 @@ struct WikipediaClient {
     }
 
     /// Fetch the article as (sectionTitle, plainText) pairs for --notes
-    static func fetchSections(pageTitle: String, verbose: Bool) async throws -> [(title: String, text: String)] {
+    public static func fetchSections(pageTitle: String, verbose: Bool) async throws -> [(title: String, text: String)] {
         var components = URLComponents(string: "https://en.wikipedia.org/w/api.php")!
         components.queryItems = [
             URLQueryItem(name: "action",          value: "query"),
@@ -139,7 +139,7 @@ struct WikipediaClient {
 
     /// Fetch URLs for all raster images in the article (for --allimages).
     /// Returns (displayTitle, url, mimeType) sorted by name; portrait URL excluded if provided.
-    static func fetchAllImageURLs(
+    public static func fetchAllImageURLs(
         pageTitle:    String,
         excludingURL: String?,
         verbose:      Bool
@@ -245,7 +245,7 @@ struct WikipediaClient {
     }
 
     /// Download image data from a URL
-    static func fetchImageData(from urlString: String, verbose: Bool) async throws -> (Data, String) {
+    public static func fetchImageData(from urlString: String, verbose: Bool) async throws -> (Data, String) {
         guard let url = URL(string: urlString) else { throw ScraperError.invalidURL(urlString) }
         if verbose { fputs("  [fetch] image \(urlString)\n", stderr) }
         let (data, resp) = try await URLSession.shared.data(from: url)
@@ -265,12 +265,12 @@ struct WikipediaClient {
 
 // MARK: - Errors
 
-enum ScraperError: LocalizedError {
+public enum ScraperError: LocalizedError {
     case invalidURL(String)
     case httpError(Int, String)
     case parseError(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalidURL(let s): return "Invalid URL: \(s)"
         case .httpError(let code, let url): return "HTTP \(code) from \(url)"

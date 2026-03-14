@@ -2,10 +2,10 @@
 
 import Foundation
 
-struct DateParser {
+public struct DateParser {
 
     // Parse wikitext date templates and plain text dates
-    static func parse(_ raw: String) -> GEDCOMDate? {
+    public static func parse(_ raw: String) -> GEDCOMDate? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return nil }
 
@@ -58,7 +58,7 @@ struct DateParser {
 
     /// Parse a date range like "20 June 1837 – 22 January 1901" or {{reign|Y|M|D|Y|M|D}}.
     /// Returns (start, end) — either may be nil.
-    static func parseRange(_ raw: String) -> (start: GEDCOMDate?, end: GEDCOMDate?) {
+    public static func parseRange(_ raw: String) -> (start: GEDCOMDate?, end: GEDCOMDate?) {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return (nil, nil) }
 
@@ -122,7 +122,7 @@ struct DateParser {
         return (parse(s), nil)
     }
 
-    static func unwrapSingleArg(_ name: String, in s: String) -> String {
+    public static func unwrapSingleArg(_ name: String, in s: String) -> String {
         guard s.contains("{{") else { return s }
         let pat = "\\{\\{\\s*\(NSRegularExpression.escapedPattern(for: name))\\s*\\|([^{}]*)\\}\\}"
         guard let regex = try? NSRegularExpression(pattern: pat, options: .caseInsensitive) else { return s }

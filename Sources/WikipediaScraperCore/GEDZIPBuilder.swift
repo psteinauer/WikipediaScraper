@@ -10,7 +10,7 @@
 import Foundation
 import ZIPFoundation
 
-struct GEDZIPBuilder {
+public struct GEDZIPBuilder {
 
     /// Create a .gdz archive at `destination`.
     ///
@@ -20,7 +20,7 @@ struct GEDZIPBuilder {
     ///   - mediaFiles: Array of `(relativePath, data)` pairs — e.g.
     ///                 `[("media/portrait.jpg", jpegData)]`.
     ///   - destination: URL where the .gdz file is written.
-    static func create(
+    public static func create(
         gedcom:     String,
         mediaFiles: [(path: String, data: Data)],
         at destination: URL
@@ -61,11 +61,11 @@ struct GEDZIPBuilder {
     }
 }
 
-enum GEDZIPError: LocalizedError {
+public enum GEDZIPError: LocalizedError {
     case cannotCreateArchive(String)
     case encodingFailed
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .cannotCreateArchive(let p): return "Cannot create ZIP archive at \(p)"
         case .encodingFailed:            return "Failed to encode GEDCOM as UTF-8"

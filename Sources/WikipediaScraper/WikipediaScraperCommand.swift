@@ -2,6 +2,7 @@
 
 import ArgumentParser
 import Foundation
+import WikipediaScraperCore
 
 @main
 struct WikipediaScraper: AsyncParsableCommand {
@@ -462,7 +463,7 @@ struct WikipediaScraper: AsyncParsableCommand {
 }
 
 extension Sex: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         switch self {
         case .male:    return "Male"
         case .female:  return "Female"

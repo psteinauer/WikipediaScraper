@@ -186,15 +186,16 @@ private struct BuildContext {
 
 // MARK: - Builder
 
-struct GEDCOMBuilder {
+public struct GEDCOMBuilder {
+    public init() {}
     private var lines: [String] = []
 
     // Convenience: single-person entry point (keeps existing call sites working)
-    mutating func build(person: PersonData, verbose: Bool) -> String {
+    public mutating func build(person: PersonData, verbose: Bool) -> String {
         build(persons: [person], verbose: verbose)
     }
 
-    mutating func build(persons: [PersonData], verbose: Bool) -> String {
+    public mutating func build(persons: [PersonData], verbose: Bool) -> String {
         lines = []
 
         // ── Allocate source IDs ────────────────────────────────────────────────

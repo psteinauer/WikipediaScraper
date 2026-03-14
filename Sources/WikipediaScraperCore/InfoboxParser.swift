@@ -2,13 +2,13 @@
 
 import Foundation
 
-struct InfoboxParser {
+public struct InfoboxParser {
 
     // MARK: - Entry point
 
     /// Parse the Wikipedia infobox and return both the PersonData and the raw field dictionary
     /// (raw fields are needed for the --mappings option).
-    static func parse(wikitext: String, pageTitle: String, verbose: Bool,
+    public static func parse(wikitext: String, pageTitle: String, verbose: Bool,
                       config: ScraperConfig = .empty) -> (person: PersonData, rawFields: [String: String]) {
         var person = PersonData()
         person.wikiTitle = pageTitle
@@ -422,7 +422,7 @@ struct InfoboxParser {
 
     // MARK: - Helpers
 
-    static func cleanText(_ s: String) -> String? {
+    public static func cleanText(_ s: String) -> String? {
         var t = s
 
         // Remove ref tags first (including multiline content)

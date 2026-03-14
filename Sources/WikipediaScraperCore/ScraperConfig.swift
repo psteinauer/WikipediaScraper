@@ -8,21 +8,21 @@ import Foundation
 ///   1. Path passed via --config
 ///   2. ./.wikipediascraperrc  (current working directory)
 ///   3. ~/.wikipediascraperrc  (home directory)
-struct ScraperConfig {
+public struct ScraperConfig {
 
     /// infobox field name → FACT TYPE display name
-    var factMappings:  [String: String] = [:]
+    public var factMappings:  [String: String] = [:]
 
     /// infobox field name → EVEN TYPE display name
-    var eventMappings: [String: String] = [:]
+    public var eventMappings: [String: String] = [:]
 
-    static let empty = ScraperConfig()
+    public static let empty = ScraperConfig()
 
     // MARK: - Loading
 
     /// Load config from an explicit path, or search default locations.
     /// Returns `.empty` if no file is found.
-    static func load(path: String? = nil, verbose: Bool = false) -> ScraperConfig {
+    public static func load(path: String? = nil, verbose: Bool = false) -> ScraperConfig {
         let candidates: [String]
         if let p = path {
             candidates = [p]

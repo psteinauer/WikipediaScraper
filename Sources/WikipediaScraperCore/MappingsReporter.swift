@@ -2,11 +2,11 @@
 
 import Foundation
 
-struct MappingsReporter {
+public struct MappingsReporter {
 
     // MARK: - Public entry point
 
-    static func report(
+    public static func report(
         person:    PersonData,
         rawFields: [String: String],
         wikiURL:   String?
