@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+*.o
+*.d
+*.ged
+*.zip
+*.gdz
+.DS_Store
+.claude/
