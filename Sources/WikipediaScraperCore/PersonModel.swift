@@ -11,6 +11,7 @@ public struct GEDCOMDate {
     public var month: Int?
     public var year:  Int?
     public var original: String = ""
+    public init() {}
 
     public static let monthNames = ["JAN","FEB","MAR","APR","MAY","JUN",
                              "JUL","AUG","SEP","OCT","NOV","DEC"]
@@ -39,6 +40,9 @@ public struct PersonEvent {
     public var place: String?
     public var note:  String?
     public var cause: String?   // DEAT.CAUS — cause of death
+    public init(date: GEDCOMDate? = nil, place: String? = nil, note: String? = nil, cause: String? = nil) {
+        self.date = date; self.place = place; self.note = note; self.cause = cause
+    }
 }
 
 // A titled position held for a period (maps to GEDCOM TITL with DATE FROM…TO)
@@ -46,12 +50,19 @@ public struct TitledPosition {
     public var title:                String
     public var startDate:            GEDCOMDate?
     public var endDate:              GEDCOMDate?
-    public var place:                String?      // capital / court / location of office
+    public var place:                String?
     public var predecessor:          String?
-    public var predecessorWikiTitle: String?      // Wikipedia article title for linking
+    public var predecessorWikiTitle: String?
     public var successor:            String?
-    public var successorWikiTitle:   String?      // Wikipedia article title for linking
+    public var successorWikiTitle:   String?
     public var note:                 String?
+    public init(title: String, startDate: GEDCOMDate? = nil, endDate: GEDCOMDate? = nil,
+                place: String? = nil, predecessor: String? = nil, predecessorWikiTitle: String? = nil,
+                successor: String? = nil, successorWikiTitle: String? = nil, note: String? = nil) {
+        self.title = title; self.startDate = startDate; self.endDate = endDate
+        self.place = place; self.predecessor = predecessor; self.predecessorWikiTitle = predecessorWikiTitle
+        self.successor = successor; self.successorWikiTitle = successorWikiTitle; self.note = note
+    }
 }
 
 // A custom named event (maps to GEDCOM EVEN with TYPE)
@@ -60,29 +71,39 @@ public struct CustomEvent {
     public var date:  GEDCOMDate?
     public var place: String?
     public var note:  String?
+    public init(type: String, date: GEDCOMDate? = nil, place: String? = nil, note: String? = nil) {
+        self.type = type; self.date = date; self.place = place; self.note = note
+    }
 }
 
 // A named individual attribute (maps to GEDCOM FACT with TYPE)
 public struct PersonFact {
-    public var type:  String   // e.g. "House", "Award", "Military rank", "Political party"
+    public var type:  String
     public var value: String
+    public init(type: String, value: String) { self.type = type; self.value = value }
 }
 
 // MARK: - PersonRef
 
 public struct PersonRef {
     public var name: String
-    public var wikiTitle: String?   // Wikipedia article title (used for deduplication/linking)
+    public var wikiTitle: String?
+    public init(name: String, wikiTitle: String? = nil) { self.name = name; self.wikiTitle = wikiTitle }
 }
 
 // MARK: - Spouse
 
 public struct SpouseInfo {
     public var name:          String
-    public var wikiTitle:     String?         // Wikipedia article title for linking
+    public var wikiTitle:     String?
     public var marriageDate:  GEDCOMDate?
     public var marriagePlace: String?
     public var divorceDate:   GEDCOMDate?
+    public init(name: String, wikiTitle: String? = nil, marriageDate: GEDCOMDate? = nil,
+                marriagePlace: String? = nil, divorceDate: GEDCOMDate? = nil) {
+        self.name = name; self.wikiTitle = wikiTitle; self.marriageDate = marriageDate
+        self.marriagePlace = marriagePlace; self.divorceDate = divorceDate
+    }
 }
 
 // MARK: - Sex
@@ -92,6 +113,8 @@ public enum Sex { case male, female, unknown }
 // MARK: - Person
 
 public struct PersonData {
+    public init() {}
+
     // ── Identity ──────────────────────────────────────────────────────────
     public var name:           String?
     public var givenName:      String?

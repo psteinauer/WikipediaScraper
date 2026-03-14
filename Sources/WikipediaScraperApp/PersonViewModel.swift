@@ -160,6 +160,30 @@ struct EditablePersonRef: Identifiable {
     }
 }
 
+struct EditableMediaItem: Identifiable {
+    var id = UUID()
+    /// Remote URL used both to preview the image and as the source when building a ZIP.
+    var url: String = ""
+    /// Human-readable caption written into the GEDCOM FILE/TITL tag.
+    var caption: String = ""
+
+    func toAdditionalMedia() -> AdditionalMedia {
+        AdditionalMedia(
+            filePath: url,
+            origURL: url.isEmpty ? nil : url,
+            title: caption.isEmpty ? nil : caption,
+            mimeType: nil
+        )
+    }
+
+    init() {}
+
+    init(from media: AdditionalMedia) {
+        self.url     = media.origURL ?? media.filePath
+        self.caption = media.title ?? ""
+    }
+}
+
 // MARK: - EditablePerson
 
 struct EditablePerson {
@@ -185,11 +209,14 @@ struct EditablePerson {
     var nationality: String = ""
     var religion: String = ""
 
-    // Metadata (not editable in main form)
+    // ── Media ─────────────────────────────────────────────────────────────
+    var imageURL: String = ""
+    var additionalMedia: [EditableMediaItem] = []
+
+    // ── Metadata (shown read-only) ─────────────────────────────────────────
     var wikiTitle: String = ""
     var wikiURL: String = ""
     var wikiExtract: String = ""
-    var imageURL: String = ""
 
     init() {}
 
@@ -216,10 +243,12 @@ struct EditablePerson {
         self.nationality = p.nationality ?? ""
         self.religion = p.religion ?? ""
 
-        self.wikiTitle = p.wikiTitle ?? ""
-        self.wikiURL = p.wikiURL ?? ""
+        self.imageURL       = p.imageURL ?? ""
+        self.additionalMedia = p.additionalMedia.map { EditableMediaItem(from: $0) }
+
+        self.wikiTitle   = p.wikiTitle ?? ""
+        self.wikiURL     = p.wikiURL ?? ""
         self.wikiExtract = p.wikiExtract ?? ""
-        self.imageURL = p.imageURL ?? ""
     }
 
     func toPersonData() -> PersonData {
@@ -230,34 +259,33 @@ struct EditablePerson {
             fullName = [givenName, surname].filter { !$0.isEmpty }.joined(separator: " ")
         }
 
-        return PersonData(
-            name: fullName.isEmpty ? nil : fullName,
-            givenName: givenName.isEmpty ? nil : givenName,
-            surname: surname.isEmpty ? nil : surname,
-            birthName: birthName.isEmpty ? nil : birthName,
-            alternateNames: [],
-            sex: sex,
-            birth: birth.toPersonEvent(),
-            death: death.toPersonEvent(),
-            burial: burial.toPersonEvent(),
-            baptism: baptism.toPersonEvent(),
-            titledPositions: titledPositions.map { $0.toTitledPosition() },
-            customEvents: customEvents.map { $0.toCustomEvent() },
-            personFacts: personFacts.map { $0.toPersonFact() },
-            honorifics: honorifics,
-            spouses: spouses.map { $0.toSpouseInfo() },
-            children: children.map { $0.toPersonRef() },
-            father: father.isEmpty ? nil : PersonRef(name: father, wikiTitle: nil),
-            mother: mother.isEmpty ? nil : PersonRef(name: mother, wikiTitle: nil),
-            parents: [],
-            occupations: occupations,
-            nationality: nationality.isEmpty ? nil : nationality,
-            religion: religion.isEmpty ? nil : religion,
-            imageURL: imageURL.isEmpty ? nil : imageURL,
-            wikiURL: wikiURL.isEmpty ? nil : wikiURL,
-            wikiTitle: wikiTitle.isEmpty ? nil : wikiTitle,
-            wikiExtract: wikiExtract.isEmpty ? nil : wikiExtract
-        )
+        var p = PersonData()
+        p.name            = fullName.isEmpty ? nil : fullName
+        p.givenName       = givenName.isEmpty ? nil : givenName
+        p.surname         = surname.isEmpty ? nil : surname
+        p.birthName       = birthName.isEmpty ? nil : birthName
+        p.sex             = sex
+        p.birth           = birth.toPersonEvent()
+        p.death           = death.toPersonEvent()
+        p.burial          = burial.toPersonEvent()
+        p.baptism         = baptism.toPersonEvent()
+        p.titledPositions = titledPositions.map { $0.toTitledPosition() }
+        p.customEvents    = customEvents.map { $0.toCustomEvent() }
+        p.personFacts     = personFacts.map { $0.toPersonFact() }
+        p.honorifics      = honorifics
+        p.spouses         = spouses.map { $0.toSpouseInfo() }
+        p.children        = children.map { $0.toPersonRef() }
+        p.father          = father.isEmpty ? nil : PersonRef(name: father, wikiTitle: nil)
+        p.mother          = mother.isEmpty ? nil : PersonRef(name: mother, wikiTitle: nil)
+        p.occupations     = occupations
+        p.nationality     = nationality.isEmpty ? nil : nationality
+        p.religion        = religion.isEmpty ? nil : religion
+        p.imageURL        = imageURL.isEmpty ? nil : imageURL
+        p.additionalMedia = additionalMedia.map { $0.toAdditionalMedia() }
+        p.wikiURL         = wikiURL.isEmpty ? nil : wikiURL
+        p.wikiTitle       = wikiTitle.isEmpty ? nil : wikiTitle
+        p.wikiExtract     = wikiExtract.isEmpty ? nil : wikiExtract
+        return p
     }
 }
 
@@ -289,8 +317,7 @@ final class PersonViewModel: ObservableObject {
             let (parsedPerson, _) = InfoboxParser.parse(
                 wikitext: wikitext,
                 pageTitle: pageTitle,
-                verbose: false,
-                config: nil
+                verbose: false
             )
 
             var editable = EditablePerson(from: parsedPerson)
@@ -329,7 +356,7 @@ final class PersonViewModel: ObservableObject {
                     var builder = GEDCOMBuilder()
                     let gedcom = builder.build(persons: [personData], verbose: false)
                     try gedcom.write(to: url, atomically: true, encoding: .utf8)
-                    self.statusMessage = "Saved GEDCOM to \(url.lastPathComponent)"
+                    self.statusMessage = "Saved \(url.lastPathComponent)"
                 } catch {
                     self.statusMessage = "Error saving: \(error.localizedDescription)"
                 }
@@ -345,38 +372,76 @@ final class PersonViewModel: ObservableObject {
         panel.canCreateDirectories = true
 
         let response = await withCheckedContinuation { continuation in
-            panel.begin { response in
-                continuation.resume(returning: response)
-            }
+            panel.begin { response in continuation.resume(returning: response) }
         }
-
         guard response == .OK, let url = panel.url else { return }
 
         do {
-            var mediaFiles: [(Data, String)] = []
+            var mediaFiles: [(path: String, data: Data)] = []
+            var personData = person.toPersonData()
 
+            // ── Primary image ────────────────────────────────────────────────
             if !person.imageURL.isEmpty {
                 do {
-                    let (imageData, filename) = try await WikipediaClient.fetchImageData(
-                        from: person.imageURL,
-                        verbose: false
-                    )
-                    mediaFiles.append((imageData, filename))
+                    let (data, mime) = try await WikipediaClient.fetchImageData(from: person.imageURL, verbose: false)
+                    let relPath = "media/\(safeBasename(person.wikiTitle, fallback: "portrait")).\(mimeExt(mime))"
+                    personData.imageFilePath = relPath
+                    mediaFiles.append((path: relPath, data: data))
                 } catch {
-                    // Non-fatal: proceed without image
-                    statusMessage = "Warning: could not fetch image — \(error.localizedDescription)"
+                    statusMessage = "Warning: could not fetch primary image — \(error.localizedDescription)"
                 }
             }
 
-            let personData = person.toPersonData()
+            // ── Additional media ──────────────────────────────────────────────
+            var resolvedExtras: [AdditionalMedia] = []
+            for (idx, item) in person.additionalMedia.enumerated() {
+                guard !item.url.isEmpty else { continue }
+                do {
+                    let (data, mime) = try await WikipediaClient.fetchImageData(from: item.url, verbose: false)
+                    let base  = item.caption.isEmpty ? "media_\(idx + 1)" : item.caption
+                    let relPath = "media/\(safeBasename(base, fallback: "media_\(idx + 1)")).\(mimeExt(mime))"
+                    resolvedExtras.append(AdditionalMedia(
+                        filePath: relPath,
+                        origURL: item.url,
+                        title: item.caption.isEmpty ? nil : item.caption,
+                        mimeType: mime
+                    ))
+                    mediaFiles.append((path: relPath, data: data))
+                } catch {
+                    // Fall back to storing the URL as a FILE reference (no embedded data)
+                    resolvedExtras.append(AdditionalMedia(
+                        filePath: item.url,
+                        origURL: item.url,
+                        title: item.caption.isEmpty ? nil : item.caption
+                    ))
+                }
+            }
+            personData.additionalMedia = resolvedExtras
+
             var builder = GEDCOMBuilder()
             let gedcom = builder.build(persons: [personData], verbose: false)
-
             try GEDZIPBuilder.create(gedcom: gedcom, mediaFiles: mediaFiles, at: url)
-            statusMessage = "Saved ZIP to \(url.lastPathComponent)"
+            statusMessage = "Saved \(url.lastPathComponent)"
         } catch {
             statusMessage = "Error saving ZIP: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Helpers
+
+    private func mimeExt(_ mime: String) -> String {
+        let m = mime.lowercased()
+        if m.contains("png")  { return "png" }
+        if m.contains("webp") { return "webp" }
+        if m.contains("gif")  { return "gif" }
+        return "jpg"
+    }
+
+    private func safeBasename(_ name: String, fallback: String) -> String {
+        let s = name
+            .replacingOccurrences(of: " ", with: "_")
+            .filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }
+        return s.isEmpty ? fallback : s
     }
 
     private func sanitizeFilename(_ name: String) -> String {

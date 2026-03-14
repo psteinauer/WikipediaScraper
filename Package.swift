@@ -30,7 +30,11 @@ let package = Package(
         .executableTarget(
             name: "WikipediaScraperApp",
             dependencies: ["WikipediaScraperCore"],
-            path: "Sources/WikipediaScraperApp"
+            path: "Sources/WikipediaScraperApp",
+            exclude: ["Info.plist"],
+            resources: [
+                .process("Assets.xcassets"),
+            ]
         ),
     ]
 )
