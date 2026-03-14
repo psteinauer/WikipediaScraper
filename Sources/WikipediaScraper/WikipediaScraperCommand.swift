@@ -320,6 +320,38 @@ struct WikipediaScraper: AsyncParsableCommand {
 
         guard !persons.isEmpty else { return }
 
+        // ── When --nopeople, strip all refs to people not on the command line ─
+        // Only the explicitly-passed persons appear in the GEDCOM.  Family links
+        // that point to another command-line person are kept; everything else is
+        // removed so the builder does not generate stub INDI records.
+        if noPeople {
+            let knownTitles = Set(persons.compactMap { $0.wikiTitle })
+            let isKnown: (String?) -> Bool = { knownTitles.contains($0 ?? "") }
+
+            for i in persons.indices {
+                persons[i].spouses  = persons[i].spouses.filter  { isKnown($0.wikiTitle) }
+                persons[i].children = persons[i].children.filter { isKnown($0.wikiTitle) }
+                persons[i].parents  = persons[i].parents.filter  { isKnown($0.wikiTitle) }
+                if !isKnown(persons[i].father?.wikiTitle) { persons[i].father = nil }
+                if !isKnown(persons[i].mother?.wikiTitle) { persons[i].mother = nil }
+
+                // Clear pred/succ names and wiki titles for non-command-line people
+                // so BuildContext does not allocate stub INDI IDs for them.
+                // The EVEN NOTE text that mentions "Preceded by: …" is cleared too,
+                // since those people won't exist in the file.
+                for j in persons[i].titledPositions.indices {
+                    if !isKnown(persons[i].titledPositions[j].predecessorWikiTitle) {
+                        persons[i].titledPositions[j].predecessor          = nil
+                        persons[i].titledPositions[j].predecessorWikiTitle = nil
+                    }
+                    if !isKnown(persons[i].titledPositions[j].successorWikiTitle) {
+                        persons[i].titledPositions[j].successor            = nil
+                        persons[i].titledPositions[j].successorWikiTitle   = nil
+                    }
+                }
+            }
+        }
+
         // ── 6. Build GEDCOM ───────────────────────────────────────────────
         if verbose { fputs("Building GEDCOM 7.0…\n", stderr) }
         var builder = GEDCOMBuilder()
