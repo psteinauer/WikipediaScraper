@@ -93,6 +93,10 @@ struct WikipediaScraper: AsyncParsableCommand {
             help: "Path to a .wikipediascraperrc config file (default: search CWD then HOME).")
     var configPath: String?
 
+    @Flag(name: .customLong("nopeople"),
+          help: "Only create GEDCOM records for the URLs passed on the command line; do not fetch referenced people.")
+    var noPeople: Bool = false
+
     // MARK: - Validation
 
     func validate() throws {
@@ -252,7 +256,7 @@ struct WikipediaScraper: AsyncParsableCommand {
         if mappings { return }
 
         // ── Fetch referenced people (1 level deep, no recursion) ──────────
-        if !mappings {
+        if !mappings && !noPeople {
             // Collect canonical wikiTitles of already-fetched persons
             var fetchedTitles = Set(persons.compactMap { $0.wikiTitle })
 

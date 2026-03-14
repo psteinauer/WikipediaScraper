@@ -81,6 +81,7 @@ WikipediaScraper [options] <URL> [<URL> ...]
 | `--mappings` | `-m` | Print field-mapping table; no GEDCOM produced |
 | `--notes` | `-n` | Append Wikipedia article sections as NOTE records |
 | `--allimages` | `-a` | Download all article images into GEDZIP (implies `--zip`) |
+| `--nopeople` | | Only create records for the URLs passed; skip referenced-person fetching |
 | `--config <path>` | | Use a specific `.wikipediascraperrc` file |
 | `--help` | `-h` | Show help |
 | `--version` | | Show version |
@@ -287,11 +288,30 @@ archive.zip (or .gdz)
 
 Each person article produces the following GEDCOM records:
 
+### Name records
+
+The primary `NAME` record is taken from the **Wikipedia article title** (`summary.title` from the REST API), since that is the definitive, canonical identifier for the person. Additional name records are added for other names found on the page:
+
+| NAME record | Source | Notes |
+|------------|--------|-------|
+| Primary `NAME` | Wikipedia article title | `GIVN` + `SURN` from infobox components |
+| Additional `NAME` | Infobox `name` / `given_name` + `surname` | Added when structured infobox name differs from article title |
+| `NAME TYPE birth` | `birth_name` | Birth / maiden name |
+| `NAME TYPE aka` | Alternate names defined in infobox | |
+
+**Examples:**
+
+| Article title | Primary `NAME` | Additional `NAME` |
+|--------------|----------------|-------------------|
+| George Washington | `George Washington` | — (infobox name is identical) |
+| Queen Victoria | `Queen Victoria` | `Victoria` (infobox `name` field) |
+| Albert, Prince Consort | `Albert, Prince Consort` | `Albert /Saxe-Coburg and Gotha/` |
+
 ### INDI record
 
 | GEDCOM tag | Source field | Notes |
 |------------|-------------|-------|
-| `NAME` | `name`, `full_name`, or page title | `GIVN` + `SURN` subrecords |
+| `NAME` | Wikipedia article title | `GIVN` + `SURN` subrecords; see Name records above |
 | `NAME TYPE birth` | `birth_name` | Alternate name record |
 | `SEX` | `gender`, `sex`, `pronouns` | Omitted when unknown |
 | `BIRT` | `birth_date`, `birth_place` | With `DATE`, `PLAC`, `SOUR` |
@@ -337,7 +357,9 @@ Portrait and additional images are stored as `OBJE` records with `FILE` pointing
 
 ## Referenced-person expansion
 
-When the tool parses a person's infobox, it extracts Wikipedia article links from family fields (spouses, children, father, mother, parents). It then automatically fetches each referenced person from Wikipedia and includes them as full INDI records — one level deep, without recursion.
+By default, when the tool parses a person's infobox, it extracts Wikipedia article links from family fields (spouses, children, father, mother, parents). It then automatically fetches each referenced person from Wikipedia and includes them as full INDI records — one level deep, without recursion.
+
+Use `--nopeople` to disable this behaviour and only create records for the URLs explicitly passed on the command line. Referenced people not on the command line become minimal stub INDI records (name only). If two command-line URLs reference each other (e.g. a couple), they are still linked through a shared FAM record.
 
 **Deduplication rules:**
 

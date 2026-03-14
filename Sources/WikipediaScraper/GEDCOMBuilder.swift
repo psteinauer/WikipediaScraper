@@ -289,24 +289,59 @@ struct GEDCOMBuilder {
     private mutating func writeMainIndividual(person: PersonData, ctx: BuildContext) {
         line(0, "\(ctx.mainIndiID) INDI")
 
-        // Primary name — Given /Surname/
-        let given = person.givenName ?? ""
-        let surn  = person.surname   ?? ""
-        if !given.isEmpty || !surn.isEmpty {
-            line(1, "NAME \(given) /\(surn)/")
-            if !given.isEmpty { line(2, "GIVN \(given)") }
-            if !surn.isEmpty  { line(2, "SURN \(surn)") }
-        } else if let full = person.name {
-            line(1, "NAME \(full)")
+        // Helper: strip GEDCOM /…/ markers and collapse whitespace for comparison
+        let normaliseName: (String) -> String = {
+            $0.replacingOccurrences(of: "/", with: "")
+              .components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+              .joined(separator: " ")
         }
 
-        // Birth name (alternate)
-        if let bn = person.birthName, bn != person.name {
+        let given = person.givenName ?? ""
+        let surn  = person.surname   ?? ""
+
+        // 1. Primary name — Wikipedia article title
+        //    Falls back to infobox name if wikiTitle is not set.
+        let primaryName = person.wikiTitle ?? person.name ?? ""
+        if !primaryName.isEmpty {
+            line(1, "NAME \(primaryName)")
+            // GIVN / SURN from infobox if available; otherwise split the title
+            if !given.isEmpty || !surn.isEmpty {
+                if !given.isEmpty { line(2, "GIVN \(given)") }
+                if !surn.isEmpty  { line(2, "SURN \(surn)") }
+            } else {
+                let (g, s) = splitGivenSurname(primaryName)
+                if !g.isEmpty { line(2, "GIVN \(g)") }
+                if !s.isEmpty { line(2, "SURN \(s)") }
+            }
+        }
+
+        // 2. Infobox-structured name as additional NAME (if different from primary)
+        //    Formatted as "Given /Surname/" for genealogy-app indexing.
+        let infoName: String?
+        if !given.isEmpty && !surn.isEmpty {
+            infoName = "\(given) /\(surn)/"
+        } else if !given.isEmpty {
+            infoName = given
+        } else if !surn.isEmpty {
+            infoName = "/\(surn)/"
+        } else {
+            infoName = person.name
+        }
+        if let inf = infoName, !inf.isEmpty,
+           normaliseName(inf) != normaliseName(primaryName) {
+            line(1, "NAME \(inf)")
+            if !given.isEmpty { line(2, "GIVN \(given)") }
+            if !surn.isEmpty  { line(2, "SURN \(surn)") }
+        }
+
+        // 3. Birth name
+        if let bn = person.birthName, !bn.isEmpty,
+           normaliseName(bn) != normaliseName(primaryName) {
             line(1, "NAME \(bn)")
             line(2, "TYPE birth")
         }
 
-        // Other names (aka)
+        // 4. Other alternate names
         for alt in person.alternateNames {
             line(1, "NAME \(alt)")
             line(2, "TYPE aka")
