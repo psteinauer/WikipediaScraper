@@ -89,6 +89,10 @@ struct WikipediaScraper: AsyncParsableCommand {
           help: "Download all article images into the GEDZIP archive (implies --zip).")
     var allimages: Bool = false
 
+    @Option(name: .customLong("config"),
+            help: "Path to a .wikipediascraperrc config file (default: search CWD then HOME).")
+    var configPath: String?
+
     // MARK: - Validation
 
     func validate() throws {
@@ -117,6 +121,9 @@ struct WikipediaScraper: AsyncParsableCommand {
         // --allimages implies zip mode
         let effectiveZip = zip || allimages
 
+        // Load .wikipediascraperrc (--config path, or CWD / HOME search)
+        let config = ScraperConfig.load(path: configPath, verbose: verbose)
+
         var persons:    [PersonData]             = []
         var mediaFiles: [(path: String, data: Data)] = []
         var firstPageTitle: String?
@@ -144,7 +151,8 @@ struct WikipediaScraper: AsyncParsableCommand {
             if verbose { fputs("\(urlLabel)Parsing infobox…\n", stderr) }
             var (person, rawFields) = InfoboxParser.parse(wikitext: wikitext,
                                                           pageTitle: pageTitle,
-                                                          verbose: verbose)
+                                                          verbose: verbose,
+                                                          config: config)
             person.wikiURL     = wikipediaURL
             person.wikiTitle   = summary.title   // use canonical title (handles redirects)
             person.wikiExtract = summary.extract
@@ -269,7 +277,8 @@ struct WikipediaScraper: AsyncParsableCommand {
                     let summary  = try await WikipediaClient.fetchSummary(pageTitle: wikiTitle, verbose: verbose)
                     let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: wikiTitle, verbose: verbose)
 
-                    var (refPerson, _) = InfoboxParser.parse(wikitext: wikitext, pageTitle: wikiTitle, verbose: false)
+                    var (refPerson, _) = InfoboxParser.parse(wikitext: wikitext, pageTitle: wikiTitle, verbose: false,
+                                                             config: config)
                     refPerson.wikiTitle   = summary.title   // canonical
                     let encodedTitle = wikiTitle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? wikiTitle
                     refPerson.wikiURL     = "https://en.wikipedia.org/wiki/\(encodedTitle.replacingOccurrences(of: " ", with: "_"))"

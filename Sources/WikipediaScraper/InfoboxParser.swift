@@ -8,7 +8,8 @@ struct InfoboxParser {
 
     /// Parse the Wikipedia infobox and return both the PersonData and the raw field dictionary
     /// (raw fields are needed for the --mappings option).
-    static func parse(wikitext: String, pageTitle: String, verbose: Bool) -> (person: PersonData, rawFields: [String: String]) {
+    static func parse(wikitext: String, pageTitle: String, verbose: Bool,
+                      config: ScraperConfig = .empty) -> (person: PersonData, rawFields: [String: String]) {
         var person = PersonData()
         person.wikiTitle = pageTitle
 
@@ -127,45 +128,62 @@ struct InfoboxParser {
             }
         }
 
+        // Track fields processed by hardcoded handlers so RC can override names
+        // and add mappings for fields not covered here.
+        var hardcodedFactFields  = Set<String>()
+        var hardcodedEventFields = Set<String>()
+
         // ── House / dynasty ────────────────────────────────────────────────────
+        let houseAliases = ["house", "dynasty", "royal_house"]
+        houseAliases.forEach { hardcodedFactFields.insert($0) }
         if let h = fields["house"] ?? fields["dynasty"] ?? fields["royal_house"] {
+            let typeName = houseAliases.compactMap { config.factMappings[$0] }.first ?? "House"
             if let clean = cleanText(h), !clean.isEmpty {
-                person.personFacts.append(PersonFact(type: "House", value: clean))
+                person.personFacts.append(PersonFact(type: typeName, value: clean))
             }
         }
 
         // ── Political party ────────────────────────────────────────────────────
+        hardcodedFactFields.insert("party")
         if let p = fields["party"] {
+            let typeName = config.factMappings["party"] ?? "Political party"
             for item in parseList(p) where !item.isEmpty {
-                person.personFacts.append(PersonFact(type: "Political party", value: item))
+                person.personFacts.append(PersonFact(type: typeName, value: item))
             }
         }
 
         // ── Military fields ────────────────────────────────────────────────────
         // Single-value fields: join list items into one fact value
-        for (fieldKey, factType) in [("branch",        "Military branch"),
-                                     ("rank",           "Military rank"),
-                                     ("service_years",  "Service years"),
-                                     ("allegiance",     "Allegiance")] {
+        for (fieldKey, defaultType) in [("branch",        "Military branch"),
+                                        ("rank",           "Military rank"),
+                                        ("service_years",  "Service years"),
+                                        ("allegiance",     "Allegiance")] {
+            hardcodedFactFields.insert(fieldKey)
             guard let v = fields[fieldKey] else { continue }
+            let typeName = config.factMappings[fieldKey] ?? defaultType
             let items = parseList(v)
             if !items.isEmpty {
                 let joined = items.joined(separator: ", ")
-                person.personFacts.append(PersonFact(type: factType, value: joined))
+                person.personFacts.append(PersonFact(type: typeName, value: joined))
             } else if let clean = cleanText(v), !clean.isEmpty {
-                person.personFacts.append(PersonFact(type: factType, value: clean))
+                person.personFacts.append(PersonFact(type: typeName, value: clean))
             }
         }
         // Battles — one fact per battle
-        let battlesRaw = fields["battles"] ?? fields["battles/wars"] ?? ""
+        hardcodedFactFields.insert("battles")
+        hardcodedFactFields.insert("battles/wars")
+        let battlesRaw    = fields["battles"] ?? fields["battles/wars"] ?? ""
+        let battleTypeName = config.factMappings["battles"] ?? config.factMappings["battles/wars"] ?? "Battle"
         for item in parseList(battlesRaw) where !item.isEmpty {
-            person.personFacts.append(PersonFact(type: "Battle", value: item))
+            person.personFacts.append(PersonFact(type: battleTypeName, value: item))
         }
 
         // ── Awards ─────────────────────────────────────────────────────────────
+        hardcodedFactFields.insert("awards")
         if let a = fields["awards"] {
+            let typeName = config.factMappings["awards"] ?? "Award"
             for item in parseList(a) where !item.isEmpty {
-                person.personFacts.append(PersonFact(type: "Award", value: item))
+                person.personFacts.append(PersonFact(type: typeName, value: item))
             }
         }
 
@@ -197,9 +215,12 @@ struct InfoboxParser {
             person.titledPositions.append(pos)
 
             // Coronation as custom event
+            hardcodedEventFields.insert("coronation\(suffix)")
             if let corRaw = fields["coronation\(suffix)"],
                !corRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                var evt = CustomEvent(type: "Coronation")
+                // cor-type overrides everything; otherwise RC config; otherwise default
+                let corDefaultType = config.eventMappings["coronation"] ?? "Coronation"
+                var evt = CustomEvent(type: corDefaultType)
                 evt.date  = DateParser.parse(corRaw)
                 evt.place = fields["cor-place\(suffix)"].flatMap { cleanText($0) }
                 if let ct = fields["cor-type\(suffix)"], let ctClean = cleanText(ct),
@@ -224,6 +245,30 @@ struct InfoboxParser {
             pos.successor   = (fields["succeeded_by\(suffix)"] ?? fields["successor\(suffix)"])
                                 .flatMap { cleanText($0) }
             person.titledPositions.append(pos)
+        }
+
+        // ── RC-defined facts (fields not covered by hardcoded handlers above) ──
+        // Entries whose field name matches a hardcoded field override its display
+        // name (already applied above). Any remaining entries add new facts.
+        for field in config.factMappings.keys.sorted() {
+            guard !hardcodedFactFields.contains(field),
+                  let typeName = config.factMappings[field], !typeName.isEmpty,
+                  let v = fields[field] else { continue }
+            for item in parseList(v) where !item.isEmpty {
+                person.personFacts.append(PersonFact(type: typeName, value: item))
+            }
+        }
+
+        // ── RC-defined events (fields not covered by hardcoded handlers above) ─
+        for field in config.eventMappings.keys.sorted() {
+            guard !hardcodedEventFields.contains(field),
+                  let typeName = config.eventMappings[field], !typeName.isEmpty,
+                  let v = fields[field] else { continue }
+            var evt = CustomEvent(type: typeName)
+            evt.date = DateParser.parse(v)
+            // If no date parsed, store the cleaned text as a note
+            if evt.date == nil || evt.date!.isEmpty { evt.note = cleanText(v) }
+            person.customEvents.append(evt)
         }
 
         // ── Occupation ─────────────────────────────────────────────────────────

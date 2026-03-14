@@ -81,6 +81,7 @@ WikipediaScraper [options] <URL> [<URL> ...]
 | `--mappings` | `-m` | Print field-mapping table; no GEDCOM produced |
 | `--notes` | `-n` | Append Wikipedia article sections as NOTE records |
 | `--allimages` | `-a` | Download all article images into GEDZIP (implies `--zip`) |
+| `--config <path>` | | Use a specific `.wikipediascraperrc` file |
 | `--help` | `-h` | Show help |
 | `--version` | | Show version |
 
@@ -167,6 +168,106 @@ WikipediaScraper --zip \
 ```bash
 WikipediaScraper --verbose --zip https://en.wikipedia.org/wiki/Napoleon
 ```
+
+---
+
+## Configuration file — `.wikipediascraperrc`
+
+WikipediaScraper supports a plain-text configuration file that lets you customise how Wikipedia infobox fields are mapped to GEDCOM facts and events, and add mappings for fields that the built-in parser doesn't handle.
+
+### File locations
+
+The tool searches for the config file in this order:
+
+1. Path supplied with `--config <path>`
+2. `.wikipediascraperrc` in the **current working directory**
+3. `~/.wikipediascraperrc` in your **home directory**
+
+The first file found is used; the others are ignored.
+
+### File format
+
+The file uses a simple INI-style format with two sections: `[facts]` and `[events]`. Lines beginning with `#` or `;` are comments; blank lines are ignored.
+
+```ini
+# ~/.wikipediascraperrc
+
+[facts]
+# field_name = FACT TYPE display name
+#
+# Maps an infobox field to a GEDCOM FACT record.
+# Each non-empty value (or list item) in the field becomes a separate FACT.
+# Field names are the lowercase infobox parameter names with spaces → underscores.
+
+party         = Political Party
+house         = Royal House
+awards        = Honour
+religion      = Religious Affiliation
+alma_mater    = Education
+
+[events]
+# field_name = EVEN TYPE display name
+#
+# Maps an infobox field to a GEDCOM EVEN record.
+# The field value is parsed as a date if possible; otherwise stored as a note.
+# One EVEN record is produced per field.
+
+coronation          = Coronation
+inauguration_date   = Inauguration
+```
+
+### How overrides work
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Field already handled by built-in code (e.g. `party`, `awards`) | RC display name replaces the built-in default |
+| Field not handled by built-in code (e.g. `alma_mater`) | New FACT or EVEN records are added for any matching infobox field |
+| Field present in RC but absent from the infobox | No output produced (silently skipped) |
+
+### Built-in fields you can rename
+
+These fields are processed by default. Add an entry to `[facts]` or `[events]` to change the display name:
+
+| Section | Infobox field | Default display name |
+|---------|--------------|----------------------|
+| `[facts]` | `party` | `Political party` |
+| `[facts]` | `house` / `dynasty` / `royal_house` | `House` |
+| `[facts]` | `awards` | `Award` |
+| `[facts]` | `branch` | `Military branch` |
+| `[facts]` | `rank` | `Military rank` |
+| `[facts]` | `allegiance` | `Allegiance` |
+| `[facts]` | `service_years` | `Service years` |
+| `[facts]` | `battles` / `battles/wars` | `Battle` |
+| `[events]` | `coronation` | `Coronation` |
+
+### George Washington example
+
+George Washington's Wikipedia infobox contains a `party` field with the value `Independent`. The built-in mapping produces `FACT Independent / TYPE Political party`. To change the type label to `Political Party`:
+
+```ini
+# ~/.wikipediascraperrc
+
+[facts]
+party = Political Party
+```
+
+Running the tool now produces:
+
+```
+1 FACT Independent
+2 TYPE Political Party
+2 SOUR @S1@
+```
+
+To also capture his `alma_mater` field (not mapped by default):
+
+```ini
+[facts]
+party      = Political Party
+alma_mater = Education
+```
+
+This would produce a `FACT College of William & Mary / TYPE Education` record.
 
 ---
 
