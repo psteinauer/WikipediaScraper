@@ -58,7 +58,7 @@ private struct BuildContext {
     var assocStubs: [AssocStub] = []
 
     init(from person: PersonData, sourID: String,
-         personRegistry: [String: String],
+         personRegistry: inout [String: String],
          familyRegistry: inout [String: String],
          nextI: inout Int, nextF: inout Int, nextO: inout Int) {
 
@@ -68,17 +68,27 @@ private struct BuildContext {
                        ?? { let id = "@I\(nextI)@"; nextI += 1; return id }()
         self.sourID = sourID
 
+        // Register a newly-allocated stub ID in the shared personRegistry so that
+        // subsequent BuildContext instances deduplicate against it.
+        // Keys: wikiTitle (preferred) and display name (fallback).
+        func register(_ id: String, wikiTitle: String?, name: String) {
+            if let wt = wikiTitle, !wt.isEmpty { personRegistry[wt] = id }
+            if !name.isEmpty, personRegistry[name] == nil { personRegistry[name] = id }
+        }
+
+        // Resolve an INDI ID for a referenced person, registering new stubs so
+        // later contexts can find them.  Returns (id, alreadyRegistered).
+        func resolve(wikiTitle: String?, name: String) -> (id: String, known: Bool) {
+            if let wt = wikiTitle, !wt.isEmpty, let id = personRegistry[wt] { return (id, true) }
+            if !name.isEmpty, let id = personRegistry[name] { return (id, true) }
+            let id = "@I\(nextI)@"; nextI += 1
+            register(id, wikiTitle: wikiTitle, name: name)
+            return (id, false)
+        }
+
         // Spouses — look up in registry, create/find FAM via familyRegistry
         for spouse in person.spouses {
-            let spouseID: String
-            let isFull: Bool
-            if let wt = spouse.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
-                spouseID = id; isFull = true
-            } else if !spouse.name.isEmpty, let id = personRegistry[spouse.name] {
-                spouseID = id; isFull = true
-            } else {
-                spouseID = "@I\(nextI)@"; nextI += 1; isFull = false
-            }
+            let (spouseID, isFull) = resolve(wikiTitle: spouse.wikiTitle, name: spouse.name)
             spouseIndiIDs.append(spouseID)
             spouseIsFullPerson.append(isFull)
 
@@ -97,15 +107,7 @@ private struct BuildContext {
 
         // Children — look up in registry
         for child in person.children {
-            let childID: String
-            let isFull: Bool
-            if let wt = child.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
-                childID = id; isFull = true
-            } else if !child.name.isEmpty, let id = personRegistry[child.name] {
-                childID = id; isFull = true
-            } else {
-                childID = "@I\(nextI)@"; nextI += 1; isFull = false
-            }
+            let (childID, isFull) = resolve(wikiTitle: child.wikiTitle, name: child.name)
             childrenIndiIDs.append(childID)
             childIsFullPerson.append(isFull)
         }
@@ -124,24 +126,14 @@ private struct BuildContext {
             var fid: String? = nil
             var fFull = false
             if let fr = fatherRef {
-                if let wt = fr.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
-                    fid = id; fFull = true
-                } else if !fr.name.isEmpty, let id = personRegistry[fr.name] {
-                    fid = id; fFull = true
-                } else {
-                    fid = "@I\(nextI)@"; nextI += 1
-                }
+                let (id, known) = resolve(wikiTitle: fr.wikiTitle, name: fr.name)
+                fid = id; fFull = known
             }
             var mid: String? = nil
             var mFull = false
             if let mr = motherRef {
-                if let wt = mr.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
-                    mid = id; mFull = true
-                } else if !mr.name.isEmpty, let id = personRegistry[mr.name] {
-                    mid = id; mFull = true
-                } else {
-                    mid = "@I\(nextI)@"; nextI += 1
-                }
+                let (id, known) = resolve(wikiTitle: mr.wikiTitle, name: mr.name)
+                mid = id; mFull = known
             }
 
             fatherIndiID = fid
@@ -164,7 +156,6 @@ private struct BuildContext {
         }
 
         // Predecessors and successors → ASSO (influential persons)
-        var seenAssoc: [String: String] = [:]   // dedup key → indiID
         for pos in person.titledPositions {
             let pairs: [(name: String?, wikiTitle: String?, rela: String)] = [
                 (pos.predecessor, pos.predecessorWikiTitle, "Predecessor"),
@@ -172,16 +163,8 @@ private struct BuildContext {
             ]
             for pair in pairs {
                 guard let n = pair.name, !n.isEmpty else { continue }
-                let key = pair.wikiTitle ?? n
-                let indiID: String
-                if let wt = pair.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
-                    // This person is already a full INDI — no stub needed
-                    indiID = id
-                } else if let id = seenAssoc[key] {
-                    indiID = id
-                } else {
-                    indiID = "@I\(nextI)@"; nextI += 1
-                    seenAssoc[key] = indiID
+                let (indiID, known) = resolve(wikiTitle: pair.wikiTitle, name: n)
+                if !known {
                     assocStubs.append(AssocStub(indiID: indiID, name: n))
                 }
                 assocLinks.append(AssocLink(
@@ -235,13 +218,15 @@ struct GEDCOMBuilder {
         }
 
         // ── Build contexts with shared registries ──────────────────────────────
+        // personRegistry is now passed inout so each context can register the
+        // stub IDs it allocates, allowing later contexts to deduplicate against them.
         var familyRegistry: [String: String] = [:]   // sorted-pair key → famID
         var contexts: [BuildContext] = []
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             let sID  = sourIDs[base] ?? "@S1@"
             contexts.append(BuildContext(from: person, sourID: sID,
-                                          personRegistry: personRegistry,
+                                          personRegistry: &personRegistry,
                                           familyRegistry: &familyRegistry,
                                           nextI: &nextI, nextF: &nextF, nextO: &nextO))
         }
