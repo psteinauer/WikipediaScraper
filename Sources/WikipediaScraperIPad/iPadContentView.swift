@@ -1,9 +1,9 @@
+#if os(iOS)
 import SwiftUI
-import AppKit
 import WikipediaScraperSharedUI
 
-struct ContentView: View {
-    @StateObject private var vm = PersonViewModel()
+struct iPadContentView: View {
+    @StateObject private var vm = iPadPersonViewModel()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,27 +15,43 @@ struct ContentView: View {
             mainContent
         }
         .navigationTitle(vm.hasData ? vm.person.wikiTitle : "Wikipedia to GEDCOM")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .focusedValue(\.personViewModel, vm)
+        // GEDCOM export sheet
+        .fileExporter(
+            isPresented:     $vm.isExportingGED,
+            document:         vm.gedDocument,
+            contentType:      .plainText,
+            defaultFilename:  vm.exportFilename + ".ged"
+        ) { vm.handleExportResult($0) }
+        // ZIP export sheet
+        .fileExporter(
+            isPresented:     $vm.isExportingZip,
+            document:         vm.zipDocument,
+            contentType:      .zip,
+            defaultFilename:  vm.exportFilename + ".zip"
+        ) { vm.handleExportResult($0) }
     }
 
     // MARK: - URL Bar
 
     private var urlBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: "globe")
                 .foregroundStyle(.secondary)
-                .imageScale(.medium)
 
             TextField("Paste a Wikipedia article URL…", text: $vm.urlString)
-                .textFieldStyle(.plain)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
                 .onSubmit { Task { await vm.fetch() } }
                 .disabled(vm.isLoading)
 
             Group {
                 if vm.isLoading {
                     ProgressView()
-                        .controlSize(.small)
+                        .controlSize(.regular)
                 } else if let status = vm.statusMessage {
                     Text(status)
                         .foregroundStyle(.secondary)
@@ -48,27 +64,15 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "arrow.right.circle.fill")
                             .imageScale(.large)
-                            .foregroundStyle(vm.urlString.isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor)
+                            .foregroundStyle(vm.urlString.isEmpty ? .quaternary : .tint)
                     }
-                    .buttonStyle(.borderless)
                     .disabled(vm.urlString.isEmpty)
-                    .keyboardShortcut(.return, modifiers: .command)
                 }
             }
-            .frame(minWidth: 22, alignment: .trailing)
+            .frame(minWidth: 30, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(NSColor.textBackgroundColor))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
-                }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Error Banner
@@ -86,8 +90,8 @@ struct ContentView: View {
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(Color.red.opacity(0.07))
         Divider()
     }
@@ -114,17 +118,19 @@ struct ContentView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Spacer()
             Image(systemName: "person.text.rectangle")
-                .font(.system(size: 56, weight: .thin))
+                .font(.system(size: 64, weight: .thin))
                 .foregroundStyle(.quaternary)
             Text("No person loaded")
                 .font(.title2)
                 .fontWeight(.medium)
                 .foregroundStyle(.secondary)
-            Text("Paste a Wikipedia biography URL above and press Return or ⌘↩")
+            Text("Paste a Wikipedia biography URL above and tap Return")
                 .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -137,7 +143,7 @@ struct ContentView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button("Export as GEDCOM…") { vm.saveAsGED() }
-                Button("Export as ZIP…") { Task { await vm.saveAsZip() } }
+                Button("Export as ZIP…")    { Task { await vm.saveAsZip() } }
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
             }
@@ -148,7 +154,7 @@ struct ContentView: View {
 
 #Preview {
     NavigationStack {
-        ContentView()
+        iPadContentView()
     }
-    .frame(width: 960, height: 720)
 }
+#endif

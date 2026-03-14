@@ -1,21 +1,68 @@
+#if os(iOS)
 import Foundation
-import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 import WikipediaScraperCore
 import WikipediaScraperSharedUI
 
-// Editable model types (EditablePerson, EditableEvent, etc.) live in WikipediaScraperSharedUI.
+// MARK: - FileDocument types
 
-// MARK: - PersonViewModel
+struct GEDCOMDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    var content: String
+
+    init(content: String = "") { self.content = content }
+
+    init(configuration: ReadConfiguration) throws {
+        content = String(
+            data: configuration.file.regularFileContents ?? Data(),
+            encoding: .utf8
+        ) ?? ""
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(content.utf8))
+    }
+}
+
+struct ZIPDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+    var data: Data
+
+    init(data: Data = Data()) { self.data = data }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - ViewModel
 
 @MainActor
-final class PersonViewModel: ObservableObject {
+final class iPadPersonViewModel: ObservableObject {
     @Published var urlString: String = ""
     @Published var person: EditablePerson = EditablePerson()
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var hasData: Bool = false
     @Published var statusMessage: String? = nil
+
+    // Export state — .fileExporter reads these
+    @Published var gedDocument  = GEDCOMDocument()
+    @Published var zipDocument  = ZIPDocument()
+    @Published var isExportingGED: Bool = false
+    @Published var isExportingZip: Bool = false
+
+    var exportFilename: String {
+        let name = person.wikiTitle.isEmpty ? "export" : person.wikiTitle
+        return name
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:*?\"<>|"))
+            .joined(separator: "_")
+    }
 
     // MARK: - Fetch
 
@@ -28,19 +75,19 @@ final class PersonViewModel: ObservableObject {
         do {
             let pageTitle = try WikipediaClient.pageTitle(from: urlString)
 
-            async let summaryResult  = WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: false)
-            async let wikitextResult = WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: false)
-            let (summary, wikitext)  = try await (summaryResult, wikitextResult)
+            async let summaryResult   = WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: false)
+            async let wikitextResult  = WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: false)
+            let (summary, wikitext)   = try await (summaryResult, wikitextResult)
 
             let (parsedPerson, _) = InfoboxParser.parse(
-                wikitext:  wikitext,
-                pageTitle: pageTitle,
-                verbose:   false
+                wikitext:   wikitext,
+                pageTitle:  pageTitle,
+                verbose:    false
             )
 
             var editable = EditablePerson(from: parsedPerson)
             editable.wikiTitle = summary.title
-            if editable.wikiURL.isEmpty { editable.wikiURL = urlString }
+            if editable.wikiURL.isEmpty      { editable.wikiURL = urlString }
             if let extract = summary.extract, editable.wikiExtract.isEmpty {
                 editable.wikiExtract = extract
             }
@@ -60,42 +107,15 @@ final class PersonViewModel: ObservableObject {
     // MARK: - Export as GEDCOM
 
     func saveAsGED() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType(filenameExtension: "ged") ?? .data]
-        panel.nameFieldStringValue = sanitizeFilename(person.wikiTitle.isEmpty ? "export" : person.wikiTitle)
-        panel.allowsOtherFileTypes = false
-        panel.canCreateDirectories = true
-
-        panel.begin { [weak self] response in
-            guard let self, response == .OK, let url = panel.url else { return }
-            Task { @MainActor in
-                do {
-                    let personData = self.person.toPersonData()
-                    var builder    = GEDCOMBuilder()
-                    let gedcom     = builder.build(persons: [personData], verbose: false)
-                    try gedcom.write(to: url, atomically: true, encoding: .utf8)
-                    self.statusMessage = "Saved \(url.lastPathComponent)"
-                } catch {
-                    self.statusMessage = "Error saving: \(error.localizedDescription)"
-                }
-            }
-        }
+        let personData = person.toPersonData()
+        var builder    = GEDCOMBuilder()
+        gedDocument    = GEDCOMDocument(content: builder.build(persons: [personData], verbose: false))
+        isExportingGED = true
     }
 
     // MARK: - Export as ZIP
 
     func saveAsZip() async {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [UTType.zip]
-        panel.nameFieldStringValue = sanitizeFilename(person.wikiTitle.isEmpty ? "export" : person.wikiTitle)
-        panel.allowsOtherFileTypes = false
-        panel.canCreateDirectories = true
-
-        let response = await withCheckedContinuation { continuation in
-            panel.begin { response in continuation.resume(returning: response) }
-        }
-        guard response == .OK, let url = panel.url else { return }
-
         do {
             var mediaFiles: [(path: String, data: Data)] = []
             var personData = person.toPersonData()
@@ -109,7 +129,7 @@ final class PersonViewModel: ObservableObject {
                     personData.imageFilePath = relPath
                     mediaFiles.append((path: relPath, data: data))
                 } catch {
-                    statusMessage = "Warning: could not fetch primary image — \(error.localizedDescription)"
+                    statusMessage = "Warning: could not fetch primary image"
                 }
             }
 
@@ -134,12 +154,31 @@ final class PersonViewModel: ObservableObject {
             }
             personData.additionalMedia = resolvedExtras
 
+            // Build GEDCOM + ZIP
             var builder = GEDCOMBuilder()
             let gedcom  = builder.build(persons: [personData], verbose: false)
-            try GEDZIPBuilder.create(gedcom: gedcom, mediaFiles: mediaFiles, at: url)
-            statusMessage = "Saved \(url.lastPathComponent)"
+
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(exportFilename + ".zip")
+            try GEDZIPBuilder.create(gedcom: gedcom, mediaFiles: mediaFiles, at: tempURL)
+            let rawData = try Data(contentsOf: tempURL)
+            try? FileManager.default.removeItem(at: tempURL)
+
+            zipDocument  = ZIPDocument(data: rawData)
+            isExportingZip = true
         } catch {
-            statusMessage = "Error saving ZIP: \(error.localizedDescription)"
+            statusMessage = "Error building ZIP: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Export result handler
+
+    func handleExportResult(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            statusMessage = "Saved \(url.lastPathComponent)"
+        case .failure(let error):
+            statusMessage = "Export failed: \(error.localizedDescription)"
         }
     }
 
@@ -159,9 +198,5 @@ final class PersonViewModel: ObservableObject {
             .filter { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }
         return s.isEmpty ? fallback : s
     }
-
-    private func sanitizeFilename(_ name: String) -> String {
-        let invalid = CharacterSet(charactersIn: "/\\:*?\"<>|")
-        return name.components(separatedBy: invalid).joined(separator: "_")
-    }
 }
+#endif

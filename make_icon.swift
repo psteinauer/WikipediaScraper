@@ -166,45 +166,64 @@ struct Slot {
     let px: Int
 }
 
-let slots: [Slot] = [
-    Slot(file: "icon_16.png",   px: 16),
-    Slot(file: "icon_32.png",   px: 32),
-    Slot(file: "icon_64.png",   px: 64),
-    Slot(file: "icon_128.png",  px: 128),
-    Slot(file: "icon_256.png",  px: 256),
-    Slot(file: "icon_512.png",  px: 512),
-    Slot(file: "icon_1024.png", px: 1024),
+struct Catalog {
+    let dir: String
+    let slots: [Slot]
+}
+
+let catalogs: [Catalog] = [
+    // macOS app icon
+    Catalog(dir: "Sources/WikipediaScraperApp/Assets.xcassets/AppIcon.appiconset", slots: [
+        Slot(file: "icon_16.png",   px: 16),
+        Slot(file: "icon_32.png",   px: 32),
+        Slot(file: "icon_64.png",   px: 64),
+        Slot(file: "icon_128.png",  px: 128),
+        Slot(file: "icon_256.png",  px: 256),
+        Slot(file: "icon_512.png",  px: 512),
+        Slot(file: "icon_1024.png", px: 1024),
+    ]),
+    // iPadOS app icon
+    Catalog(dir: "Sources/WikipediaScraperIPad/Assets.xcassets/AppIcon.appiconset", slots: [
+        Slot(file: "icon_ipad_20.png",   px: 20),
+        Slot(file: "icon_ipad_29.png",   px: 29),
+        Slot(file: "icon_ipad_40.png",   px: 40),
+        Slot(file: "icon_ipad_58.png",   px: 58),
+        Slot(file: "icon_ipad_76.png",   px: 76),
+        Slot(file: "icon_ipad_80.png",   px: 80),
+        Slot(file: "icon_ipad_152.png",  px: 152),
+        Slot(file: "icon_ipad_167.png",  px: 167),
+        Slot(file: "icon_ipad_1024.png", px: 1024),
+    ]),
 ]
 
-let outDir = "Sources/WikipediaScraperApp/Assets.xcassets/AppIcon.appiconset"
-try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
-
-for slot in slots {
-    let px = slot.px
-    let s  = CGFloat(px)
-
+func writePNG(px: Int, to path: String) {
+    let s = CGFloat(px)
     guard let ctx = CGContext(
         data: nil, width: px, height: px,
         bitsPerComponent: 8, bytesPerRow: 0,
         space: CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ) else { fputs("⚠ context failed \(px)\n", stderr); continue }
+    ) else { fputs("⚠ context failed \(px)\n", stderr); return }
 
     renderIcon(ctx: ctx, size: s)
 
-    guard let cgImg = ctx.makeImage() else { fputs("⚠ image failed \(px)\n", stderr); continue }
-
+    guard let cgImg = ctx.makeImage() else { fputs("⚠ image failed \(px)\n", stderr); return }
     let rep = NSBitmapImageRep(cgImage: cgImg)
     guard let png = rep.representation(using: .png, properties: [:]) else {
-        fputs("⚠ png encode failed \(px)\n", stderr); continue
+        fputs("⚠ png encode failed \(px)\n", stderr); return
     }
-
-    let path = "\(outDir)/\(slot.file)"
     do {
         try png.write(to: URL(fileURLWithPath: path))
         print("✓ \(path)  (\(px)×\(px))")
     } catch {
         fputs("⚠ write failed \(path): \(error)\n", stderr)
+    }
+}
+
+for catalog in catalogs {
+    try? FileManager.default.createDirectory(atPath: catalog.dir, withIntermediateDirectories: true)
+    for slot in catalog.slots {
+        writePNG(px: slot.px, to: "\(catalog.dir)/\(slot.file)")
     }
 }
 print("Icon generation complete.")

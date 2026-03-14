@@ -1,9 +1,11 @@
 CLI_BINARY    = WikipediaScraper
 APP_BINARY    = WikipediaScraperApp
 APP_BUNDLE    = WikipediaScraper.app
+IPAD_BINARY   = WikipediaScraperIPad
+IPAD_SCHEME   = WikipediaScraperIPad
 INSTALL_PREFIX ?= /usr/local/bin
 
-.PHONY: build release install app app-release clean xcode test
+.PHONY: build release install app app-release ipad ipad-sim icons clean xcode test
 
 ## Build debug binaries
 build:
@@ -48,6 +50,33 @@ app: app-release
 
 app-release:
 	swift build -c release --product $(APP_BINARY)
+
+## Build and run the iPadOS app in the iPad simulator (requires Xcode)
+ipad-sim:
+	@echo "→ Building $(IPAD_SCHEME) for iPad simulator…"
+	xcrun xcodebuild \
+	    -scheme "$(IPAD_SCHEME)" \
+	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M4)" \
+	    -configuration Debug \
+	    build | xcpretty 2>/dev/null || \
+	xcrun xcodebuild \
+	    -scheme "$(IPAD_SCHEME)" \
+	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M4)" \
+	    -configuration Debug \
+	    build
+
+## Build the iPadOS app in release (archive — no install)
+ipad:
+	@echo "→ Building $(IPAD_SCHEME) release for iOS…"
+	xcrun xcodebuild \
+	    -scheme "$(IPAD_SCHEME)" \
+	    -destination "generic/platform=iOS" \
+	    -configuration Release \
+	    build
+
+## Regenerate all app icons (macOS + iPadOS) from make_icon.swift
+icons:
+	swift make_icon.swift
 
 ## Open the package in Xcode
 xcode:
