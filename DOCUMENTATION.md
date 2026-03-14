@@ -1,6 +1,6 @@
 # WikipediaScraper — Technical Documentation
 
-This document covers the software architecture, data-flow pipelines, and module internals for both the command-line tool and the macOS app. It is intended for developers working on or extending the codebase.
+This document covers the software architecture, data-flow pipelines, and module internals for the CLI tool, macOS app, and iPadOS app. It is intended for developers working on or extending the codebase.
 
 ---
 
@@ -17,27 +17,35 @@ This document covers the software architecture, data-flow pipelines, and module 
    - [GEDZIPBuilder](#36-gedzipbuilder)
    - [MappingsReporter](#37-mappingsreporter)
    - [ScraperConfig](#38-scraperconfig)
-4. [CLI Tool — WikipediaScraper](#4-cli-tool--wikipediascraper)
-   - [Entry Point and Argument Parsing](#41-entry-point-and-argument-parsing)
-   - [CLI Data Flow](#42-cli-data-flow)
-   - [Referenced-Person Expansion](#43-referenced-person-expansion)
-   - [Deduplication](#44-deduplication)
-   - [--nopeople Mode](#45---nopeople-mode)
-5. [macOS App — WikipediaScraperApp](#5-macos-app--wikipediascraperapp)
-   - [Scene and Window Setup](#51-scene-and-window-setup)
-   - [App Data Flow](#52-app-data-flow)
-   - [PersonViewModel](#53-personviewmodel)
-   - [ContentView](#54-contentview)
-   - [PersonEditorView](#55-personeditorview)
-   - [Export Paths](#56-export-paths)
-6. [Key Algorithms](#6-key-algorithms)
-   - [Infobox Extraction](#61-infobox-extraction)
-   - [Date Parsing](#62-date-parsing)
-   - [GEDCOM Name Construction](#63-gedcom-name-construction)
-   - [Xref Allocation and Deduplication](#64-xref-allocation-and-deduplication)
-7. [GEDCOM 7.0 Output Reference](#7-gedcom-70-output-reference)
-8. [Configuration System](#8-configuration-system)
-9. [Icon Generation](#9-icon-generation)
+4. [Shared UI Library — WikipediaScraperSharedUI](#4-shared-ui-library--wikipediascrapersharedui)
+   - [EditableTypes](#41-editabletypes)
+   - [PersonEditorView](#42-personeditorview)
+5. [CLI Tool — WikipediaScraper](#5-cli-tool--wikipediascraper)
+   - [Entry Point and Argument Parsing](#51-entry-point-and-argument-parsing)
+   - [CLI Data Flow](#52-cli-data-flow)
+   - [Referenced-Person Expansion](#53-referenced-person-expansion)
+   - [Deduplication](#54-deduplication)
+   - [--nopeople Mode](#55---nopeople-mode)
+6. [macOS App — WikipediaScraperApp](#6-macos-app--wikipediascraperapp)
+   - [Scene and Window Setup](#61-scene-and-window-setup)
+   - [App Data Flow](#62-app-data-flow)
+   - [PersonViewModel](#63-personviewmodel)
+   - [ContentView](#64-contentview)
+   - [Export Paths](#65-export-paths)
+7. [iPadOS App — WikipediaScraperIPad](#7-ipados-app--wikipediascraperipad)
+   - [Scene Setup](#71-scene-setup)
+   - [Platform Compilation Strategy](#72-platform-compilation-strategy)
+   - [iPadPersonViewModel](#73-ipadpersonviewmodel)
+   - [iPadContentView](#74-ipadcontentview)
+   - [Export Paths](#75-export-paths)
+8. [Key Algorithms](#8-key-algorithms)
+   - [Infobox Extraction](#81-infobox-extraction)
+   - [Date Parsing](#82-date-parsing)
+   - [GEDCOM Name Construction](#83-gedcom-name-construction)
+   - [Xref Allocation and Deduplication](#84-xref-allocation-and-deduplication)
+9. [GEDCOM 7.0 Output Reference](#9-gedcom-70-output-reference)
+10. [Configuration System](#10-configuration-system)
+11. [Icon Generation](#11-icon-generation)
 
 ---
 
@@ -45,12 +53,12 @@ This document covers the software architecture, data-flow pipelines, and module 
 
 ```
 WikipediaScraper/
-├── Package.swift                      SPM manifest — three targets
-├── Makefile                           Build, install, app-bundle, test targets
-├── make_icon.swift                    Standalone Swift script — generates app icon PNGs
+├── Package.swift                      SPM manifest — five targets
+├── Makefile                           Build, install, app-bundle, ipad, test targets
+├── make_icon.swift                    Standalone Swift script — generates icon PNGs
 │
 ├── Sources/
-│   ├── WikipediaScraperCore/          Library target — shared between CLI and app
+│   ├── WikipediaScraperCore/          Library — shared by CLI, macOS app, and iPadOS app
 │   │   ├── PersonModel.swift
 │   │   ├── WikipediaClient.swift
 │   │   ├── InfoboxParser.swift
@@ -60,69 +68,89 @@ WikipediaScraper/
 │   │   ├── MappingsReporter.swift
 │   │   └── ScraperConfig.swift
 │   │
+│   ├── WikipediaScraperSharedUI/      SwiftUI library — shared by macOS + iPadOS apps
+│   │   ├── EditableTypes.swift        Editable model wrappers (EditablePerson, etc.)
+│   │   └── PersonEditorView.swift     PersonEditorView, EventSectionContent, MediaThumbnail
+│   │
 │   ├── WikipediaScraper/              CLI executable target
 │   │   └── WikipediaScraperCommand.swift
 │   │
-│   └── WikipediaScraperApp/          macOS SwiftUI app target
-│       ├── WikipediaScraperApp.swift
-│       ├── ContentView.swift
-│       ├── PersonEditorView.swift
-│       ├── PersonViewModel.swift
+│   ├── WikipediaScraperApp/           macOS SwiftUI app target
+│   │   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
+│   │   ├── ContentView.swift          URL bar, toolbar, window layout
+│   │   ├── PersonViewModel.swift      ViewModel — fetch + NSSavePanel export
+│   │   ├── Info.plist
+│   │   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
+│   │
+│   └── WikipediaScraperIPad/          iPadOS SwiftUI app target
+│       ├── WikipediaScraperIPadApp.swift  @main (iOS) + macOS compilation stub
+│       ├── iPadContentView.swift      Touch UI, .fileExporter modifiers
+│       ├── iPadPersonViewModel.swift  ViewModel — fetch + FileDocument export
 │       ├── Info.plist
-│       └── Assets.xcassets/
-│           └── AppIcon.appiconset/    7 PNG sizes + Contents.json
+│       └── Assets.xcassets/           iPad app icon (9 PNG sizes)
 │
 └── .build/                            SPM build artefacts (git-ignored)
 ```
 
 **Package targets:**
 
-| Target | Type | Dependencies |
-|--------|------|--------------|
-| `WikipediaScraperCore` | Library | ZIPFoundation |
-| `WikipediaScraper` | Executable | WikipediaScraperCore, ArgumentParser |
-| `WikipediaScraperApp` | Executable | WikipediaScraperCore |
+| Target | Type | Platform | Dependencies |
+|--------|------|----------|--------------|
+| `WikipediaScraperCore` | Library | macOS 13, iOS 16 | ZIPFoundation |
+| `WikipediaScraperSharedUI` | Library | macOS 13, iOS 16 | WikipediaScraperCore |
+| `WikipediaScraper` | Executable | macOS 13 | WikipediaScraperCore, ArgumentParser |
+| `WikipediaScraperApp` | Executable | macOS 13 | WikipediaScraperCore, WikipediaScraperSharedUI |
+| `WikipediaScraperIPad` | Executable | iOS 16 | WikipediaScraperCore, WikipediaScraperSharedUI |
 
-All public types in `WikipediaScraperCore` carry explicit `public` access modifiers so they are visible to both executables. Struct synthesised memberwise initialisers are `internal` by default in Swift, so all structs used across the module boundary carry explicit `public init(...)` declarations.
+All public types in `WikipediaScraperCore` and `WikipediaScraperSharedUI` carry explicit `public` access modifiers so they are visible across module boundaries. All cross-module structs carry explicit `public init(...)` declarations because synthesised memberwise initialisers are `internal` by default in Swift.
 
 ---
 
 ## 2. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    WikipediaScraperCore                     │
-│                                                             │
-│  Wikipedia APIs ──► WikipediaClient                        │
-│                          │                                  │
-│                   wikitext + summary                        │
-│                          │                                  │
-│           ┌──────────────▼──────────────┐                  │
-│           │       InfoboxParser          │                  │
-│           │  (uses DateParser +          │                  │
-│           │   ScraperConfig)             │                  │
-│           └──────────────┬──────────────┘                  │
-│                          │ PersonData                       │
-│           ┌──────────────▼──────────────┐                  │
-│           │      GEDCOMBuilder          │                  │
-│           └──────────────┬──────────────┘                  │
-│                          │ GEDCOM 7.0 text                  │
-│           ┌──────────────▼──────────────┐                  │
-│           │      GEDZIPBuilder          │ (optional)        │
-│           └──────────────┬──────────────┘                  │
-│                          │ .zip / .gdz archive              │
-└──────────────────────────┼──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                      WikipediaScraperCore                        │
+│                                                                  │
+│  Wikipedia APIs ──► WikipediaClient                             │
+│                          │                                       │
+│                   wikitext + summary                             │
+│                          │                                       │
+│           ┌──────────────▼──────────────┐                       │
+│           │       InfoboxParser          │                       │
+│           │  (uses DateParser +          │                       │
+│           │   ScraperConfig)             │                       │
+│           └──────────────┬──────────────┘                       │
+│                          │ PersonData                            │
+│           ┌──────────────▼──────────────┐                       │
+│           │      GEDCOMBuilder          │                       │
+│           └──────────────┬──────────────┘                       │
+│                          │ GEDCOM 7.0 text                       │
+│           ┌──────────────▼──────────────┐                       │
+│           │      GEDZIPBuilder          │ (optional)             │
+│           └──────────────┬──────────────┘                       │
+│                          │ .zip / .gdz archive                   │
+└──────────────────────────┼───────────────────────────────────────┘
                            │
-          ┌────────────────┴────────────────┐
-          │                                 │
-    WikipediaScraper                 WikipediaScraperApp
-    (CLI — ArgumentParser)           (macOS SwiftUI app)
-    WikipediaScraperCommand          PersonViewModel
-                                     ContentView
-                                     PersonEditorView
+┌──────────────────────────┼───────────────────────────────────────┐
+│           WikipediaScraperSharedUI                               │
+│                          │                                       │
+│         EditableTypes ◄──┤──► PersonEditorView                  │
+│         (EditablePerson, │    (Form, MediaThumbnail,             │
+│          EditableEvent,  │     EventSectionContent)              │
+│          …)              │                                       │
+└──────────────────────────┼───────────────────────────────────────┘
+                           │
+          ┌────────────────┼──────────────────┐
+          │                │                  │
+  WikipediaScraper   WikipediaScraperApp  WikipediaScraperIPad
+  (CLI)              (macOS SwiftUI)      (iPadOS SwiftUI)
+  AsyncParsable      PersonViewModel      iPadPersonViewModel
+  Command            ContentView          iPadContentView
+                     NSSavePanel          .fileExporter
 ```
 
-Both consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The only difference is the orchestration layer: the CLI uses `AsyncParsableCommand`, the app uses `@MainActor ObservableObject`.
+All three consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The macOS and iPadOS apps share the `EditableTypes` and `PersonEditorView` from `WikipediaScraperSharedUI`; they differ only in their export mechanisms and window setup.
 
 ---
 
@@ -190,7 +218,7 @@ struct GEDCOMDate {
 }
 ```
 
-The `gedcom` computed property emits the GEDCOM 7 date string: qualifier prefix (`ABT`, `BEF`, `AFT`) followed by optional day, month abbreviation, year. An exact date with no components returns `""`.
+The `gedcom` computed property emits the GEDCOM 7 date string: qualifier prefix (`ABT`, `BEF`, `AFT`) followed by optional day, month abbreviation, year.
 
 ---
 
@@ -241,10 +269,10 @@ The most complex module. Converts raw wikitext into a `PersonData` value.
 
 ```swift
 InfoboxParser.parse(
-    wikitext: String,
+    wikitext:  String,
     pageTitle: String,
-    verbose: Bool,
-    config: ScraperConfig = .empty
+    verbose:   Bool,
+    config:    ScraperConfig = .empty
 ) -> (person: PersonData, rawFields: [String: String])
 ```
 
@@ -504,9 +532,95 @@ The file uses a simple INI-like format: blank lines and `#`/`;`-prefixed lines a
 
 ---
 
-## 4. CLI Tool — WikipediaScraper
+## 4. Shared UI Library — WikipediaScraperSharedUI
 
-### 4.1 Entry Point and Argument Parsing
+**Directory:** `Sources/WikipediaScraperSharedUI/`
+
+A SwiftUI library target that compiles for both macOS 13 and iOS 16. It contains everything shared between the macOS and iPadOS apps: the editable model layer and the main editor view hierarchy. Platform-specific colours are handled with `#if os(macOS)` / `#else` guards at the top of each file.
+
+### 4.1 EditableTypes
+
+**File:** `Sources/WikipediaScraperSharedUI/EditableTypes.swift`
+
+The editable types mirror the `PersonModel` types but use plain `String` fields for every date, place, and name — matching SwiftUI's `TextField` binding requirement. All types are `public` with explicit `public init()` declarations.
+
+```
+EditablePerson
+├── givenName / surname / birthName / sex
+├── birth / death / burial / baptism : EditableEvent
+│       └── date (String) / place / note / cause
+├── titledPositions : [EditableTitledPosition]
+│       └── title / startDate / endDate / place / predecessor / successor / note
+├── customEvents : [EditableCustomEvent]
+│       └── type (editable) / date / place / note
+├── personFacts : [EditablePersonFact]
+│       └── type (editable) / value
+├── honorifics  : [String]
+├── spouses     : [EditableSpouse]
+│       └── name / marriageDate / marriagePlace / divorceDate
+├── children    : [EditablePersonRef]
+├── father / mother : String
+├── occupations : [String]
+├── nationality / religion : String
+├── imageURL : String                       ← primary image URL
+├── additionalMedia : [EditableMediaItem]
+│       └── url (String) / caption (String)
+└── wikiTitle / wikiURL / wikiExtract       ← read-only metadata
+```
+
+Each editable type provides:
+- `init()` — blank instance for "Add" buttons.
+- `init(from: PersonModelType)` — construct from parsed data.
+- `toXxx() -> PersonModelType` — convert back for export; dates re-parsed via `DateParser.parse()`.
+
+`EditablePerson.toPersonData()` assigns each property individually on a blank `PersonData()` (the memberwise init is `internal` in the Core module and not accessible here).
+
+### 4.2 PersonEditorView
+
+**File:** `Sources/WikipediaScraperSharedUI/PersonEditorView.swift`
+
+`public struct PersonEditorView: View` — `Form { … }.formStyle(.grouped)`. All 14 sections are extracted to computed `@ViewBuilder` properties for readability. No business logic; entirely driven by `@Binding var person: EditablePerson`.
+
+**Sections in order:**
+
+| Section | Key controls |
+|---------|-------------|
+| Identity | `TextField` for names; `Picker(.segmented)` for sex |
+| Media | `AsyncImage` thumbnails + URL `TextField`; add/remove additional media |
+| Birth / Death / Burial / Baptism | `EventSectionContent` sub-view |
+| Titled Positions | Expandable rows — all fields editable including type |
+| Custom Events | Expandable rows — event type is a `TextField` |
+| Facts | Two-column `TextField` rows — both type and value editable |
+| Honorifics | Single `TextField` rows |
+| Spouses | Expandable rows |
+| Children | `TextField` list |
+| Parents | `TextField` for father, mother |
+| Occupations | `TextField` list |
+| Other | `TextField` for nationality, religion |
+
+**Supporting types (also public):**
+
+`EventSectionContent` — reusable sub-view for any life event (date/place/note/cause fields). Used by all four life-event sections.
+
+`MediaThumbnail` — `AsyncImage`-based thumbnail with all loading phases handled. Uses `NSColor`/`UIColor` conditionally for separator and background colours:
+
+```swift
+#if os(macOS)
+import AppKit
+private var separatorColor:   Color { Color(NSColor.separatorColor) }
+private var thumbnailBGColor: Color { Color(NSColor.unemphasizedSelectedContentBackgroundColor) }
+#else
+import UIKit
+private var separatorColor:   Color { Color(UIColor.separator) }
+private var thumbnailBGColor: Color { Color(UIColor.secondarySystemBackground) }
+#endif
+```
+
+---
+
+## 5. CLI Tool — WikipediaScraper
+
+### 5.1 Entry Point and Argument Parsing
 
 **File:** `Sources/WikipediaScraper/WikipediaScraperCommand.swift`
 
@@ -543,7 +657,7 @@ struct WikipediaScraper: AsyncParsableCommand {
 - `--allimages` implies `--zip`; incompatible with `--preflight` and `--mappings`.
 - `--output` incompatible with `--preflight`.
 
-### 4.2 CLI Data Flow
+### 5.2 CLI Data Flow
 
 ```
 for each URL in wikipediaURLs:
@@ -585,7 +699,7 @@ if zip mode:      GEDZIPBuilder.create(gedcom:mediaFiles:at:)
 else:             gedcom.write(to: outputURL)
 ```
 
-### 4.3 Referenced-Person Expansion
+### 5.3 Referenced-Person Expansion
 
 When not running in `--nopeople` mode, the tool collects Wikipedia article titles from:
 - `person.spouses[*].wikiTitle`
@@ -597,7 +711,7 @@ When not running in `--nopeople` mode, the tool collects Wikipedia article title
 
 Titles already present in the command-line persons list are skipped. Each new title is fetched with the same `fetchSummary` + `fetchWikitext` + `InfoboxParser.parse` pipeline. The fetch is one level deep — referenced persons' own family links are **not** followed.
 
-### 4.4 Deduplication
+### 5.4 Deduplication
 
 `GEDCOMBuilder` maintains two shared registries across all `BuildContext` instances:
 
@@ -610,7 +724,7 @@ var familyRegistry: [String: String]   // canonical key     → @Fx@ xref ID
 
 **Family deduplication:** A canonical key `"\(husbandID):\(wifeID)"` (IDs sorted so `@I1@:@I3@` and `@I3@:@I1@` are the same) is checked against `familyRegistry` before writing a FAM record. If found, the existing `@Fx@` is referenced — preventing duplicate FAM records for a couple who appear in each other's infoboxes.
 
-### 4.5 --nopeople Mode
+### 5.5 --nopeople Mode
 
 When `--nopeople` is set, after all command-line persons are parsed, a pre-processing pass strips all family and position references pointing to persons **not** on the command line:
 
@@ -635,9 +749,9 @@ This runs before `GEDCOMBuilder.build()`, so the builder never sees the stripped
 
 ---
 
-## 5. macOS App — WikipediaScraperApp
+## 6. macOS App — WikipediaScraperApp
 
-### 5.1 Scene and Window Setup
+### 6.1 Scene and Window Setup
 
 **File:** `Sources/WikipediaScraperApp/WikipediaScraperApp.swift`
 
@@ -658,9 +772,7 @@ struct WikipediaScraperApp: App {
 }
 ```
 
-`NavigationStack` provides:
-- A window title bar that updates via `.navigationTitle()` inside `ContentView`.
-- Standard macOS toolbar chrome for `.toolbar { }` items.
+`NavigationStack` provides a window title bar that updates via `.navigationTitle()` and standard toolbar chrome.
 
 `AppCommands` wires the active window's `PersonViewModel` into the macOS menu bar using SwiftUI's focused-value system:
 
@@ -672,9 +784,9 @@ struct WikipediaScraperApp: App {
 @FocusedValue(\.personViewModel) private var vm: PersonViewModel?
 ```
 
-This allows File > Export as GEDCOM… and File > Export as ZIP… to operate on whichever window is currently focused.
+This allows File > Export as GEDCOM… (⌘E) and File > Export as ZIP… (⌘⇧E) to operate on whichever window is currently focused.
 
-### 5.2 App Data Flow
+### 6.2 App Data Flow
 
 ```
 User pastes URL → ContentView.urlBar
@@ -707,49 +819,17 @@ PersonViewModel.fetch()
                            │
                  ┌─────────┴──────────┐
                  │ .ged               │ .zip
-                 │ write to URL       │ fetchImageData() × N
-                 │                   │ GEDZIPBuilder.create()
+                 │ NSSavePanel        │ fetchImageData() × N
+                 │ write to URL       │ GEDZIPBuilder.create()
 ```
 
-### 5.3 PersonViewModel
+### 6.3 PersonViewModel
 
 **File:** `Sources/WikipediaScraperApp/PersonViewModel.swift`
 
 `@MainActor final class PersonViewModel: ObservableObject`
 
-The ViewModel is the single source of truth for the app window. It holds the in-flight URL string, the parsed/edited person, loading/error/status state, and drives all network and file I/O.
-
-#### Editable model hierarchy
-
-The editable types mirror the PersonModel types but use plain `String` fields for every date, place, and name — matching SwiftUI's `TextField` binding requirement.
-
-```
-EditablePerson
-├── givenName / surname / birthName / sex
-├── birth / death / burial / baptism : EditableEvent
-│       └── date (String) / place / note / cause
-├── titledPositions : [EditableTitledPosition]
-│       └── title / startDate / endDate / place / predecessor / successor / note
-├── customEvents : [EditableCustomEvent]
-│       └── type (editable) / date / place / note
-├── personFacts : [EditablePersonFact]
-│       └── type (editable) / value
-├── honorifics  : [String]
-├── spouses     : [EditableSpouse]
-├── children    : [EditablePersonRef]
-├── father / mother : String
-├── occupations : [String]
-├── nationality / religion : String
-├── imageURL : String                   ← primary image URL
-├── additionalMedia : [EditableMediaItem]
-│       └── url (String) / caption (String)
-└── wikiTitle / wikiURL / wikiExtract   ← read-only metadata
-```
-
-Each editable type provides:
-- `init()` — blank instance for "Add" buttons.
-- `init(from: PersonModelType)` — construct from parsed data.
-- `toXxx() -> PersonModelType` — convert back for export, parsing dates via `DateParser.parse()`.
+The ViewModel holds the in-flight URL string, the parsed/edited person (as `EditablePerson` from `WikipediaScraperSharedUI`), loading/error/status state, and drives all network and file I/O. Export uses `NSSavePanel` for the native macOS save dialog.
 
 #### saveAsZip workflow
 
@@ -776,7 +856,7 @@ func saveAsZip() async {
 }
 ```
 
-### 5.4 ContentView
+### 6.4 ContentView
 
 **File:** `Sources/WikipediaScraperApp/ContentView.swift`
 
@@ -796,32 +876,7 @@ NavigationStack
 
 The URL bar uses `NSColor.textBackgroundColor` fill and `NSColor.separatorColor` stroke to match native macOS text field appearance while incorporating the globe icon and fetch button into a single pill-shaped row.
 
-### 5.5 PersonEditorView
-
-**File:** `Sources/WikipediaScraperApp/PersonEditorView.swift`
-
-`Form { … }.formStyle(.grouped)` — macOS grouped form style rendering. All 14 sections are extracted to computed `@ViewBuilder` properties for readability. No business logic; entirely driven by `@Binding var person: EditablePerson`.
-
-**Sections in order:**
-
-| Section | Key controls |
-|---------|-------------|
-| Identity | `TextField` for names; `Picker(.segmented)` for sex |
-| Media | `AsyncImage` thumbnails + URL `TextField`; Add/remove additional media |
-| Birth / Death / Burial / Baptism | `EventSectionContent` sub-view |
-| Titled Positions | Expandable rows — all fields editable including type |
-| Custom Events | Expandable rows — event type is a `TextField` |
-| Facts | Two-column `TextField` rows — both type and value editable |
-| Honorifics | Single `TextField` rows |
-| Spouses | Expandable rows |
-| Children | `TextField` list |
-| Parents | `TextField` for father, mother |
-| Occupations | `TextField` list |
-| Other | `TextField` for nationality, religion |
-
-`MediaThumbnail` is a private sub-view that uses `AsyncImage` with a fallback placeholder icon. Each additional-media item displays a live thumbnail that updates as the URL field changes.
-
-### 5.6 Export Paths
+### 6.5 Export Paths
 
 #### Export as GEDCOM (.ged)
 
@@ -831,7 +886,7 @@ person.toPersonData()
     → String.write(to: url, atomically: true, encoding: .utf8)
 ```
 
-The plain GEDCOM uses remote URLs for all `FILE` tags (no embedded media). `personData.imageURL` is preserved as-is in the OBJE record.
+The plain GEDCOM preserves remote URLs in all `FILE` tags; no images are downloaded.
 
 #### Export as ZIP
 
@@ -846,9 +901,190 @@ GEDZIPBuilder.create(gedcom:mediaFiles:at:)  ← packs gedcom.ged + media/*
 
 ---
 
-## 6. Key Algorithms
+## 7. iPadOS App — WikipediaScraperIPad
 
-### 6.1 Infobox Extraction
+### 7.1 Scene Setup
+
+**File:** `Sources/WikipediaScraperIPad/WikipediaScraperIPadApp.swift`
+
+```swift
+#if os(iOS)
+@main
+struct WikipediaScraperIPadApp: App {
+    var body: some Scene {
+        WindowGroup {
+            NavigationStack {
+                iPadContentView()
+            }
+        }
+    }
+}
+#else
+// macOS compilation stub
+@main
+struct WikipediaScraperIPadApp {
+    static func main() {}
+}
+#endif
+```
+
+The `WindowGroup` enables multi-window support on iPadOS (Stage Manager on supported hardware). No `.commands {}` block is needed on iPadOS — there is no menu bar.
+
+### 7.2 Platform Compilation Strategy
+
+The iPad target is a standard SPM `.executableTarget`. Since `swift build` on macOS compiles **all** targets, the iPad source files would otherwise fail to compile (they reference `UIKit`, `UIActivityViewController`, etc., which are unavailable on macOS). The solution: every iPad-specific source file wraps its entire content in `#if os(iOS)`:
+
+```swift
+#if os(iOS)
+import UIKit
+// ... all platform-specific code ...
+#endif
+```
+
+`WikipediaScraperIPadApp.swift` additionally provides a `#else` block with a macOS-compatible `@main` entry-point stub. This guarantees the `WikipediaScraperIPad` executable always has a valid entry point for linking, regardless of the build platform.
+
+The `WikipediaScraperSharedUI` library compiles correctly on both platforms using `#if os(macOS)` / `#else` guards for any platform-specific APIs (currently limited to colour system types).
+
+Build matrix summary:
+
+| Command | macOS targets built | iPadOS target built |
+|---------|--------------------|--------------------|
+| `swift build` | Core, SharedUI, CLI, macOS app, iPad stub | Empty files (stub only) |
+| `xcodebuild -scheme WikipediaScraperIPad -destination iOS` | — | Core, SharedUI, iPad app |
+
+### 7.3 iPadPersonViewModel
+
+**File:** `Sources/WikipediaScraperIPad/iPadPersonViewModel.swift`
+
+`@MainActor final class iPadPersonViewModel: ObservableObject`
+
+The fetch logic is identical to the macOS ViewModel. Export differs: rather than presenting `NSSavePanel`, the ViewModel builds a `FileDocument` value and sets a Boolean flag that triggers SwiftUI's `.fileExporter` modifier, which presents the iOS document picker.
+
+#### FileDocument types
+
+```swift
+struct GEDCOMDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    var content: String
+    // init(content:), init(configuration:), fileWrapper(configuration:)
+}
+
+struct ZIPDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.zip] }
+    var data: Data
+    // init(data:), init(configuration:), fileWrapper(configuration:)
+}
+```
+
+#### saveAsGED workflow
+
+```swift
+func saveAsGED() {
+    let personData = person.toPersonData()
+    var builder    = GEDCOMBuilder()
+    gedDocument    = GEDCOMDocument(content: builder.build(persons: [personData], verbose: false))
+    isExportingGED = true      // triggers .fileExporter in iPadContentView
+}
+```
+
+#### saveAsZip workflow
+
+```swift
+func saveAsZip() async {
+    // Same image fetch loop as macOS saveAsZip():
+    //   fetch primary image, build relative paths, build resolvedExtras
+    //
+    // Write ZIP to a temp file URL:
+    //   FileManager.default.temporaryDirectory.appendingPathComponent(…)
+    //   GEDZIPBuilder.create(gedcom:mediaFiles:at: tempURL)
+    //
+    // Read back as Data:
+    //   let rawData = try Data(contentsOf: tempURL)
+    //   FileManager.default.removeItem(at: tempURL)
+    //
+    // Trigger export sheet:
+    //   zipDocument  = ZIPDocument(data: rawData)
+    //   isExportingZip = true
+}
+```
+
+The ZIP must be round-tripped through a temp file because `GEDZIPBuilder` writes to a URL via ZIPFoundation (it does not produce in-memory `Data` directly).
+
+### 7.4 iPadContentView
+
+**File:** `Sources/WikipediaScraperIPad/iPadContentView.swift`
+
+Structurally identical to the macOS `ContentView` but adapted for touch:
+
+| macOS ContentView | iPadContentView |
+|-------------------|-----------------|
+| `NSColor.textBackgroundColor` URL bar background | Plain `HStack` with `roundedBorder` text field |
+| `ProgressView().controlSize(.small)` | `ProgressView().controlSize(.regular)` |
+| `TextField` with no keyboard attributes | `TextField` + `.keyboardType(.URL)` + `.textInputAutocapitalization(.never)` + `.autocorrectionDisabled()` |
+| `.keyboardShortcut(.return, modifiers: .command)` on fetch button | No keyboard shortcut (no hardware keyboard assumed) |
+| `NSSavePanel` triggered from ViewModel | `.fileExporter` modifiers on the view |
+| Empty state: "press Return or ⌘↩" | Empty state: "tap Return" |
+
+The two `.fileExporter` modifiers are applied directly to the root `VStack`:
+
+```swift
+.fileExporter(
+    isPresented:    $vm.isExportingGED,
+    document:        vm.gedDocument,
+    contentType:     .plainText,
+    defaultFilename: vm.exportFilename + ".ged"
+) { vm.handleExportResult($0) }
+
+.fileExporter(
+    isPresented:    $vm.isExportingZip,
+    document:        vm.zipDocument,
+    contentType:     .zip,
+    defaultFilename: vm.exportFilename + ".zip"
+) { vm.handleExportResult($0) }
+```
+
+Both present the standard iOS document picker, allowing the user to save to Files, iCloud Drive, or any connected provider.
+
+### 7.5 Export Paths
+
+#### Export as GEDCOM (.ged)
+
+```
+vm.saveAsGED()
+    person.toPersonData()
+    GEDCOMBuilder.build() → GEDCOM string
+    GEDCOMDocument(content: gedcom)
+    isExportingGED = true
+        │
+        ▼ .fileExporter triggers
+    iOS document picker → user picks destination
+    GEDCOMDocument.fileWrapper() → FileWrapper(regularFileWithContents: Data(string))
+    system writes file
+```
+
+#### Export as ZIP
+
+```
+vm.saveAsZip() async
+    fetch all images → (Data, mimeType) × N
+    build mediaFiles [(path, data)]
+    GEDCOMBuilder.build() → GEDCOM string
+    GEDZIPBuilder.create() → writes to temp URL
+    Data(contentsOf: tempURL) → zipData
+    ZIPDocument(data: zipData)
+    isExportingZip = true
+        │
+        ▼ .fileExporter triggers
+    iOS document picker → user picks destination
+    ZIPDocument.fileWrapper() → FileWrapper(regularFileWithContents: zipData)
+    system writes file
+```
+
+---
+
+## 8. Key Algorithms
+
+### 8.1 Infobox Extraction
 
 The infobox lives somewhere inside the wikitext as `{{ Infobox royalty | … }}` or similar. Extracting it reliably requires a balanced-brace scan rather than regex, because field values can themselves contain nested templates.
 
@@ -868,7 +1104,7 @@ For each character:
 
 Once the block is found, fields are extracted with the same technique: split on `|` pipes, but only at `depth == 0` (skipping pipes inside nested templates and wikilinks).
 
-### 6.2 Date Parsing
+### 8.2 Date Parsing
 
 The parser handles three broad categories of Wikipedia date representation:
 
@@ -894,7 +1130,7 @@ The parser handles three broad categories of Wikipedia date representation:
 - Match tokens against month-name table (January/Jan/JANUARY/1 → 1)
 - Assign remaining numeric tokens: value 1–31 → day; value 1000–2100 → year
 
-### 6.3 GEDCOM Name Construction
+### 8.3 GEDCOM Name Construction
 
 Every person gets one primary `NAME` record derived from the Wikipedia article title (the most authoritative, canonical identifier). Structured name components are attached as subrecords.
 
@@ -926,7 +1162,7 @@ Additional NAME records:
         2 TYPE aka
 ```
 
-### 6.4 Xref Allocation and Deduplication
+### 8.4 Xref Allocation and Deduplication
 
 All record IDs (`@Ix@`, `@Fx@`, `@Sx@`, `@Ox@`) are allocated from monotonically-increasing integers tracked as `inout` parameters passed through every `BuildContext` initialiser. This ensures uniqueness across the entire output file regardless of how many persons or contexts are processed.
 
@@ -948,7 +1184,7 @@ Family deduplication uses a canonical key `sorted([husbandID, wifeID]).joined(se
 
 ---
 
-## 7. GEDCOM 7.0 Output Reference
+## 9. GEDCOM 7.0 Output Reference
 
 ### Record structure
 
@@ -1032,7 +1268,7 @@ Splits occur at byte boundaries, never inside a multi-byte UTF-8 sequence.
 
 ---
 
-## 8. Configuration System
+## 10. Configuration System
 
 `ScraperConfig` is loaded once at startup and passed through to `InfoboxParser.parse()`. Fields in the config override or supplement the built-in field mapping tables inside `InfoboxParser`.
 
@@ -1052,29 +1288,36 @@ The case-sensitivity of infobox field keys is normalised to lowercase during ext
 
 ---
 
-## 9. Icon Generation
+## 11. Icon Generation
 
 **File:** `make_icon.swift`
 
-A standalone Swift script (not part of any build target) that generates the app icon programmatically using CoreGraphics. Run from the project root:
+A standalone Swift script (not part of any build target) that generates app icons for both the macOS and iPadOS apps using CoreGraphics. Run from the project root:
 
 ```bash
 swift make_icon.swift
+# or via Makefile:
+make icons
 ```
 
-This overwrites all PNG files in `Sources/WikipediaScraperApp/Assets.xcassets/AppIcon.appiconset/` and regenerates icons at 16, 32, 64, 128, 256, 512, and 1024 pixels. The `make app` target then calls `xcrun actool` to compile these PNGs into `AppIcon.icns` and `Assets.car` inside the `.app` bundle.
+The script generates two sets of PNG files:
+
+| Output directory | Sizes (px) | Target |
+|-----------------|-----------|--------|
+| `Sources/WikipediaScraperApp/Assets.xcassets/AppIcon.appiconset/` | 16, 32, 64, 128, 256, 512, 1024 | macOS |
+| `Sources/WikipediaScraperIPad/Assets.xcassets/AppIcon.appiconset/` | 20, 29, 40, 58, 76, 80, 152, 167, 1024 | iPadOS |
+
+The `make app` target calls `xcrun actool` to compile the macOS PNGs into `AppIcon.icns` and `Assets.car` inside the `.app` bundle. Xcode compiles the iPad icon catalog automatically when building the `WikipediaScraperIPad` scheme.
 
 ### Design
 
-The icon renders in a 1024×1024 CoreGraphics bitmap context (Y-axis flipped to top-left origin):
+The icon renders in a CoreGraphics bitmap context (Y-axis flipped to top-left origin):
 
 1. **Background** — radial gradient from rich forest green (`#1D4A35`) at the centre to near-black (`#0D2A1D`) at the edges.
-2. **Decorative tree silhouette** — overlapping filled circles in a slightly lighter dark green, forming an organic canopy shape behind the chart. A trunk rectangle descends from the canopy to the bottom.
+2. **Decorative tree silhouette** — overlapping filled circles in a slightly lighter dark green, forming an organic canopy shape. A trunk rectangle descends to the bottom.
 3. **Glow halo** — radial gradient centred on the subject node creates a warm gold ambient glow.
-4. **Connecting lines** — round-capped lines in warm gold (`rgba(0.80, 0.60, 0.25, 0.80)`) form the pedigree chart branches: trunk stub → subject → two parents → four grandparents.
+4. **Connecting lines** — round-capped lines in warm gold form the pedigree chart branches: trunk stub → subject → two parents → four grandparents.
 5. **Node circles** — filled circles at each junction, increasing in brightness toward the subject (cream-gold at bottom, darker gold at top).
 6. **Person silhouettes** — head circle + rounded-rectangle body in a dark forest colour, rendered inside every node.
-7. **Subject rim** — a subtle white stroke ring around the subject node to make it visually prominent.
+7. **Subject rim** — a subtle white stroke ring around the subject node for visual prominence.
 8. **Leaf accents** — two semi-transparent green bezier-path leaves in the upper corners.
-
-The 7 output sizes share identical drawing code; the `size` parameter scales all coordinates proportionally, ensuring the icon looks sharp at every resolution including Retina @2x slots.

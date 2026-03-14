@@ -1,10 +1,11 @@
 # WikipediaScraper
 
-A Swift toolkit that converts Wikipedia biography articles into standards-compliant **GEDCOM 7.0** genealogy files. The toolkit ships in two forms that share the same parsing engine:
+A Swift toolkit that converts Wikipedia biography articles into standards-compliant **GEDCOM 7.0** genealogy files. The toolkit ships in three forms that share the same parsing engine:
 
 | Tool | What it is |
 |------|-----------|
 | **Wikipedia to GEDCOM** (macOS app) | Point-and-click GUI — paste a Wikipedia URL, review and edit all parsed data, then export |
+| **Wikipedia to GEDCOM** (iPadOS app) | Same editor experience on iPad — touch-friendly URL bar, exports via iOS document picker |
 | **WikipediaScraper** (CLI tool) | Scriptable command-line tool — batch processing, automation, advanced options |
 
 ---
@@ -49,6 +50,38 @@ Double-click the app in Finder or Launchpad to open it. On first launch macOS ma
 | Other | Nationality, religion |
 
 The **Media** section shows a live thumbnail for every image URL. Use **Add Media** to embed additional Wikimedia images in the exported ZIP.
+
+---
+
+## iPadOS App — Wikipedia to GEDCOM
+
+### Installation
+
+Open the package in Xcode (`make xcode`) and run the `WikipediaScraperIPad` scheme on an iPad or iPad simulator.
+
+To build for a connected iPad device:
+
+```bash
+make xcode       # open Package.swift in Xcode
+# Select the WikipediaScraperIPad scheme → your iPad → Run
+```
+
+To build in the simulator from the command line (requires Xcode):
+
+```bash
+make ipad-sim    # builds for iPad Pro 13-inch (M4) simulator
+```
+
+### How to use it
+
+1. **Paste a Wikipedia URL** into the address bar at the top and tap Return.
+2. The app fetches the article, parses the infobox, and populates all fields.
+3. **Review and edit** every field — identical editing capabilities to the macOS app.
+4. **Export** using the toolbar button (top-right):
+   - **Export as GEDCOM…** — opens the iOS document picker to save a `.ged` file.
+   - **Export as ZIP…** — downloads all media, then opens the document picker to save a `.zip` GEDZIP archive.
+
+The iPadOS app supports all four orientations and multi-window (Stage Manager) on supported hardware.
 
 ---
 
@@ -147,17 +180,22 @@ WikipediaScraper --verbose --zip https://en.wikipedia.org/wiki/Napoleon
 
 ## Requirements
 
-- macOS 13 or later
-- Swift 5.9+ (ships with Xcode 15+)
-- Internet connection (Wikipedia APIs)
+| Target | Minimum version |
+|--------|----------------|
+| macOS app | macOS 13 (Ventura) |
+| iPadOS app | iOS / iPadOS 16 |
+| CLI tool | macOS 13 (Ventura) |
+| Build tools | Swift 5.9+ (Xcode 15+) |
+
+An internet connection is required to fetch Wikipedia articles and images.
 
 ---
 
-## Features (both tools)
+## Features (all tools)
 
 - Parses Wikipedia infoboxes (`royalty`, `officeholder`, `biography`, `military person` templates) into structured genealogy data
 - Outputs GEDCOM 7.0 with full compliance: correct xrefs, UTF-8, CONT line-splitting, proper tag hierarchy
-- Accepts **multiple Wikipedia URLs** in a single run — all persons land in one GEDCOM file
+- Accepts **multiple Wikipedia URLs** in a single run — all persons land in one GEDCOM file (CLI)
 - Automatically fetches Wikipedia data for **referenced people** (spouses, parents, children) one level deep
 - Persons referenced by multiple input URLs are **deduplicated** — one INDI record, one FAM record, shared across all contexts
 - Downloads portrait images from Wikimedia and packages them into a **GEDZIP archive**
@@ -165,7 +203,7 @@ WikipediaScraper --verbose --zip https://en.wikipedia.org/wiki/Napoleon
 - Emits titled positions (reign, office) as **GEDCOM EVEN with TYPE "Nobility title"**
 - Predecessor/successor links use **ASSO + RELA** (Influential Persons)
 - Source citations use **SOUR.WWW** (top-level domain) + **PAGE** (specific article URL) + **DATA.TEXT** (article extract)
-- Field-mapping diagnostic report shows exactly how each infobox field was interpreted
+- Field-mapping diagnostic report shows exactly how each infobox field was interpreted (CLI `--mappings`)
 
 ---
 
@@ -287,6 +325,9 @@ Use `--nopeople` (CLI) to include only the explicitly-specified URLs. Referenced
 | `make app` | Release macOS `.app` bundle → `WikipediaScraper.app` |
 | `make install` | Build release CLI and install to `/usr/local/bin` |
 | `make install INSTALL_PREFIX=<dir>` | Install CLI to custom directory |
+| `make ipad-sim` | Build iPadOS app for iPad simulator (requires Xcode) |
+| `make ipad` | Build iPadOS app release for device (requires Xcode) |
+| `make icons` | Regenerate all app icon PNGs (macOS + iPadOS) |
 | `make xcode` | Open package in Xcode |
 | `make clean` | Remove build artefacts and `WikipediaScraper.app` |
 | `make test` | Smoke-test CLI against George Washington article |
@@ -297,7 +338,7 @@ Use `--nopeople` (CLI) to include only the explicitly-specified URLs. Referenced
 
 ```
 Sources/
-├── WikipediaScraperCore/          Shared library (used by both CLI and app)
+├── WikipediaScraperCore/          Shared library (CLI + macOS app + iPadOS app)
 │   ├── PersonModel.swift          Data model — PersonData, GEDCOMDate, SpouseInfo, …
 │   ├── WikipediaClient.swift      Wikipedia REST + MediaWiki API calls
 │   ├── InfoboxParser.swift        Wikitext infobox → PersonData extraction
@@ -307,17 +348,28 @@ Sources/
 │   ├── MappingsReporter.swift     Diagnostic field-mapping table (--mappings)
 │   └── ScraperConfig.swift        .wikipediascraperrc loader
 │
+├── WikipediaScraperSharedUI/      Shared SwiftUI library (macOS + iPadOS)
+│   ├── EditableTypes.swift        Editable model types — EditablePerson, EditableEvent, …
+│   └── PersonEditorView.swift     PersonEditorView, EventSectionContent, MediaThumbnail
+│
 ├── WikipediaScraper/              Command-line tool target
 │   └── WikipediaScraperCommand.swift  Entry point, argument parsing, orchestration
 │
-└── WikipediaScraperApp/           macOS SwiftUI app target
-    ├── WikipediaScraperApp.swift  @main entry point, app commands, scene setup
-    ├── ContentView.swift          Main window layout — URL bar, toolbar, content area
-    ├── PersonEditorView.swift     Editable form — all fields, sections, media panel
-    ├── PersonViewModel.swift      ObservableObject ViewModel — fetch, edit, export
-    └── Assets.xcassets/           App icon (generated by make_icon.swift)
+├── WikipediaScraperApp/           macOS SwiftUI app target
+│   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
+│   ├── ContentView.swift          URL bar, toolbar, window layout
+│   ├── PersonViewModel.swift      ObservableObject ViewModel — fetch + NSSavePanel export
+│   ├── Info.plist                 macOS bundle metadata
+│   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
+│
+└── WikipediaScraperIPad/          iPadOS SwiftUI app target
+    ├── WikipediaScraperIPadApp.swift  @main (iOS) + macOS stub for swift build
+    ├── iPadContentView.swift      Touch-optimised URL bar, .fileExporter modifiers
+    ├── iPadPersonViewModel.swift  ViewModel — fetch + iOS document picker export
+    ├── Info.plist                 iPadOS bundle metadata
+    └── Assets.xcassets/           iPad app icon (9 PNG sizes)
 
-make_icon.swift                    Icon generator — re-run to regenerate PNGs
+make_icon.swift                    Icon generator — regenerates macOS + iPadOS PNGs
 ```
 
 ---
@@ -338,7 +390,7 @@ make_icon.swift                    Icon generator — re-run to regenerate PNGs
 - Date parsing handles the most common Wikipedia date formats; highly non-standard formats fall back to an empty date
 - Referenced-person expansion is one level deep; it does not recursively follow the family trees of fetched persons
 - `--allimages` skips small images (< 100×100 px), icons, flags, logos, and other decorative images based on filename heuristics
-- The macOS app processes one person at a time; use the CLI for multi-person batch exports
+- The macOS and iPadOS apps process one person at a time; use the CLI for multi-person batch exports
 
 ---
 
