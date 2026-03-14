@@ -56,12 +56,12 @@ ipad-sim:
 	@echo "→ Building $(IPAD_SCHEME) for iPad simulator…"
 	xcrun xcodebuild \
 	    -scheme "$(IPAD_SCHEME)" \
-	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M4)" \
+	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M5)" \
 	    -configuration Debug \
 	    build | xcpretty 2>/dev/null || \
 	xcrun xcodebuild \
 	    -scheme "$(IPAD_SCHEME)" \
-	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M4)" \
+	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M5)" \
 	    -configuration Debug \
 	    build
 

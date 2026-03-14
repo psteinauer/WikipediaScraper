@@ -48,31 +48,34 @@ struct iPadContentView: View {
                 .onSubmit { Task { await vm.fetch() } }
                 .disabled(vm.isLoading)
 
-            Group {
-                if vm.isLoading {
-                    ProgressView()
-                        .controlSize(.regular)
-                } else if let status = vm.statusMessage {
-                    Text(status)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .transition(.opacity.animation(.easeOut))
-                } else {
-                    Button {
-                        Task { await vm.fetch() }
-                    } label: {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .imageScale(.large)
-                            .foregroundStyle(vm.urlString.isEmpty ? .quaternary : .tint)
-                    }
-                    .disabled(vm.urlString.isEmpty)
-                }
-            }
-            .frame(minWidth: 30, alignment: .trailing)
+            fetchControl
+                .frame(minWidth: 30, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder
+    private var fetchControl: some View {
+        if vm.isLoading {
+            ProgressView()
+                .controlSize(.regular)
+        } else if let status = vm.statusMessage {
+            Text(status)
+                .foregroundStyle(.secondary)
+                .font(.caption)
+                .lineLimit(1)
+                .transition(.opacity.animation(.easeOut))
+        } else {
+            Button {
+                Task { await vm.fetch() }
+            } label: {
+                Image(systemName: "arrow.right.circle.fill")
+                    .imageScale(.large)
+                    .foregroundStyle(vm.urlString.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint))
+            }
+            .disabled(vm.urlString.isEmpty)
+        }
     }
 
     // MARK: - Error Banner

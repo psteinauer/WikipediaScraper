@@ -27,12 +27,17 @@ public struct ScraperConfig {
         if let p = path {
             candidates = [p]
         } else {
+#if os(macOS)
             let cwd  = FileManager.default.currentDirectoryPath
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             candidates = [
                 (cwd  as NSString).appendingPathComponent(".wikipediascraperrc"),
                 (home as NSString).appendingPathComponent(".wikipediascraperrc"),
             ]
+#else
+            // Config files are a CLI / macOS concept; iOS has no accessible home directory.
+            candidates = []
+#endif
         }
 
         for candidate in candidates {
