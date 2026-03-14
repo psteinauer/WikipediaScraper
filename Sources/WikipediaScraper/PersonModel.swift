@@ -66,10 +66,18 @@ struct PersonFact {
     var value: String
 }
 
+// MARK: - PersonRef
+
+struct PersonRef {
+    var name: String
+    var wikiTitle: String?   // Wikipedia article title (used for deduplication/linking)
+}
+
 // MARK: - Spouse
 
 struct SpouseInfo {
     var name:          String
+    var wikiTitle:     String?         // Wikipedia article title for linking
     var marriageDate:  GEDCOMDate?
     var marriagePlace: String?
     var divorceDate:   GEDCOMDate?
@@ -114,10 +122,10 @@ struct PersonData {
 
     // ── Family ────────────────────────────────────────────────────────────
     var spouses:  [SpouseInfo] = []
-    var children: [String]     = []
-    var father:   String?
-    var mother:   String?
-    var parents:  [String]     = []
+    var children: [PersonRef]  = []
+    var father:   PersonRef?
+    var mother:   PersonRef?
+    var parents:  [PersonRef]  = []
 
     // ── Standard attributes ───────────────────────────────────────────────
     var occupations: [String] = []

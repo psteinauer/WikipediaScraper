@@ -162,7 +162,7 @@ struct MappingsReporter {
             // Compute offset — children INDI IDs come after spouses
             let spouseOffset = 2 + person.spouses.count
             let paths = person.children.enumerated().map { (i, child) in
-                "@I\(spouseOffset + i)@ INDI.NAME \"\(child)\" (stub)"
+                "@I\(spouseOffset + i)@ INDI.NAME \"\(child.name)\" (stub)"
             }
             addRow(nk, raw: truncate(nr, 38), paths: paths)
         }
@@ -174,31 +174,31 @@ struct MappingsReporter {
         var parentFamWritten = false
 
         if let nk = firstPresent(["father"], in: rawFields), let nr = rawFields[nk],
-           let fname = person.father {
+           let fref = person.father {
             let pfam = "@F\(parentFamOffset)@"
             let fid  = "@I\(parentIndiOffset)@"
             addRow(nk, raw: truncate(nr, 38),
                    paths: ["@I1@ INDI.FAMC \(pfam)",
                            "\(pfam) FAM.HUSB \(fid)",
-                           "\(fid) INDI.NAME \"\(fname)\" (stub)",
+                           "\(fid) INDI.NAME \"\(fref.name)\" (stub)",
                            "\(fid) INDI.SEX M"])
             parentFamWritten = true
         }
 
         if let nk = firstPresent(["mother"], in: rawFields), let nr = rawFields[nk],
-           let mname = person.mother {
+           let mref = person.mother {
             let pfam = "@F\(parentFamOffset)@"
             let mid  = "@I\(parentIndiOffset + (person.father != nil ? 1 : 0))@"
             addRow(nk, raw: truncate(nr, 38),
                    paths: [parentFamWritten ? "\(pfam) FAM.WIFE \(mid)" : "@I1@ INDI.FAMC \(pfam)",
-                           "\(mid) INDI.NAME \"\(mname)\" (stub)",
+                           "\(mid) INDI.NAME \"\(mref.name)\" (stub)",
                            "\(mid) INDI.SEX F"])
         }
 
         if let nk = firstPresent(["parents"], in: rawFields), let nr = rawFields[nk],
            !person.parents.isEmpty {
             addRow(nk, raw: truncate(nr, 38),
-                   paths: person.parents.map { "@I\(parentIndiOffset)@ INDI.NAME \"\($0)\" (stub)" })
+                   paths: person.parents.map { "@I\(parentIndiOffset)@ INDI.NAME \"\($0.name)\" (stub)" })
         }
 
         // ── Honorifics (simple TITL) ──────────────────────────────────────────

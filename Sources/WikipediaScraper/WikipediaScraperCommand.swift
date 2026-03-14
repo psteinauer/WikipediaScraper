@@ -146,6 +146,7 @@ struct WikipediaScraper: AsyncParsableCommand {
                                                           pageTitle: pageTitle,
                                                           verbose: verbose)
             person.wikiURL     = wikipediaURL
+            person.wikiTitle   = summary.title   // use canonical title (handles redirects)
             person.wikiExtract = summary.extract
 
             // Best image URL from REST summary, fallback to infobox-derived URL
@@ -241,6 +242,64 @@ struct WikipediaScraper: AsyncParsableCommand {
 
         // Mappings mode exits here (all reports already printed above)
         if mappings { return }
+
+        // ── Fetch referenced people (1 level deep, no recursion) ──────────
+        if !mappings {
+            // Collect canonical wikiTitles of already-fetched persons
+            var fetchedTitles = Set(persons.compactMap { $0.wikiTitle })
+
+            // Collect all referenced wiki titles from infoboxes
+            var toFetch = Set<String>()
+            for person in persons {
+                for sp  in person.spouses  { if let wt = sp.wikiTitle  { toFetch.insert(wt) } }
+                for ch  in person.children { if let wt = ch.wikiTitle  { toFetch.insert(wt) } }
+                if let wt = person.father?.wikiTitle { toFetch.insert(wt) }
+                if let wt = person.mother?.wikiTitle { toFetch.insert(wt) }
+                for pr in person.parents   { if let wt = pr.wikiTitle  { toFetch.insert(wt) } }
+            }
+            toFetch.subtract(fetchedTitles)
+
+            if !toFetch.isEmpty && verbose {
+                fputs("Fetching \(toFetch.count) referenced person(s)…\n", stderr)
+            }
+
+            for wikiTitle in toFetch.sorted() {
+                if verbose { fputs("  [ref] \(wikiTitle)\n", stderr) }
+                do {
+                    let summary  = try await WikipediaClient.fetchSummary(pageTitle: wikiTitle, verbose: verbose)
+                    let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: wikiTitle, verbose: verbose)
+
+                    var (refPerson, _) = InfoboxParser.parse(wikitext: wikitext, pageTitle: wikiTitle, verbose: false)
+                    refPerson.wikiTitle   = summary.title   // canonical
+                    let encodedTitle = wikiTitle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? wikiTitle
+                    refPerson.wikiURL     = "https://en.wikipedia.org/wiki/\(encodedTitle.replacingOccurrences(of: " ", with: "_"))"
+                    refPerson.wikiExtract = summary.extract
+                    let refImageSourceURL = summary.originalimage?.source ?? summary.thumbnail?.source ?? refPerson.imageURL
+                    refPerson.imageURL = refImageSourceURL
+
+                    // Download portrait in zip mode
+                    if effectiveZip, let imgURL = refImageSourceURL {
+                        do {
+                            let (data, mime) = try await WikipediaClient.fetchImageData(from: imgURL, verbose: false)
+                            refPerson.imageData     = data
+                            refPerson.imageMimeType = mime
+                            let ext       = imageExtension(mime: mime, url: imgURL)
+                            let safeT     = sanitize(summary.title)
+                            let mediaPath = "media/\(safeT).\(ext)"
+                            refPerson.imageFilePath = mediaPath
+                            mediaFiles.append((mediaPath, data))
+                        } catch {
+                            // Portrait is optional
+                        }
+                    }
+
+                    persons.append(refPerson)
+                    fetchedTitles.insert(summary.title)
+                } catch {
+                    fputs("Warning: Could not fetch referenced person '\(wikiTitle)': \(error.localizedDescription)\n", stderr)
+                }
+            }
+        }
 
         guard !persons.isEmpty else { return }
 
@@ -345,8 +404,8 @@ struct WikipediaScraper: AsyncParsableCommand {
             fputs("Spouses:    \(person.spouses.map(\.name).joined(separator: ", "))\n", stderr)
         }
         if !person.children.isEmpty { fputs("Children:   \(person.children.count)\n", stderr) }
-        if let f = person.father    { fputs("Father:     \(f)\n", stderr) }
-        if let m = person.mother    { fputs("Mother:     \(m)\n", stderr) }
+        if let f = person.father    { fputs("Father:     \(f.name)\n", stderr) }
+        if let m = person.mother    { fputs("Mother:     \(m.name)\n", stderr) }
         if let url = person.imageURL { fputs("Image URL:  \(url)\n", stderr) }
         if let lp  = person.imageFilePath { fputs("Image path: \(lp) (in zip)\n", stderr) }
         fputs("----------------------\n", stderr)

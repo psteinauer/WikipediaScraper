@@ -101,13 +101,17 @@ struct InfoboxParser {
 
         // Children
         if let c = fields["children"] ?? fields["issue"] ?? fields["offspring"] {
-            person.children = parseList(c)
+            person.children = parsePersonRefList(c)
         }
 
         // Parents
-        if let f = fields["father"] { person.father = cleanText(f) }
-        if let m = fields["mother"] { person.mother = cleanText(m) }
-        if let p = fields["parents"] { person.parents = parseList(p) }
+        if let f = fields["father"] {
+            person.father = cleanText(f).map { PersonRef(name: $0, wikiTitle: extractWikiTitle(from: f)) }
+        }
+        if let m = fields["mother"] {
+            person.mother = cleanText(m).map { PersonRef(name: $0, wikiTitle: extractWikiTitle(from: m)) }
+        }
+        if let p = fields["parents"] { person.parents = parsePersonRefList(p) }
 
         // ── Burial date (separate from burial place) ──────────────────────────
         if let bd = fields["burial_date"] {
@@ -494,6 +498,31 @@ struct InfoboxParser {
                     .filter { !$0.isEmpty && !$0.hasPrefix("|") && !$0.hasSuffix("|") && !$0.contains("={{") }
     }
 
+    // Extract the Wikipedia article target from [[Target|Display]] or [[Target]]
+    private static func extractWikiTitle(from s: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: #"\[\[([^\]\|]+)"#) else { return nil }
+        let ns = s as NSString
+        guard let match = regex.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
+              match.range(at: 1).location != NSNotFound else { return nil }
+        let raw = ns.substring(with: match.range(at: 1))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "_", with: " ")
+        return raw.isEmpty ? nil : raw
+    }
+
+    // Parse a list field and return [PersonRef], preserving wikiTitle before cleaning
+    private static func parsePersonRefList(_ s: String) -> [PersonRef] {
+        var t = s
+        t = t.replacingOccurrences(of: #"<br\s*/?>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+        return t.components(separatedBy: .newlines).compactMap { raw -> PersonRef? in
+            let wt = extractWikiTitle(from: raw)
+            guard let name = cleanText(raw) else { return nil }
+            let clean = name.replacingOccurrences(of: #"^\s*[\*\-\•]\s*"#, with: "", options: .regularExpression)
+            guard !clean.isEmpty && !clean.hasPrefix("|") && !clean.hasSuffix("|") && !clean.contains("={{") else { return nil }
+            return PersonRef(name: clean, wikiTitle: wt)
+        }
+    }
+
     private static func parseSpouses(_ s: String) -> [SpouseInfo] {
         // {{marriage|Name|date}} or {{marriage|Name|date|end date}}
         var spouses: [SpouseInfo] = []
@@ -504,18 +533,26 @@ struct InfoboxParser {
             let ns = s as NSString
             let matches = regex.matches(in: s, range: NSRange(location: 0, length: ns.length))
             for match in matches {
-                let name = (match.range(at: 1).location != NSNotFound) ? ns.substring(with: match.range(at: 1)) : ""
+                let nameRaw = (match.range(at: 1).location != NSNotFound) ? ns.substring(with: match.range(at: 1)) : ""
                 let startDate = (match.range(at: 2).location != NSNotFound) ? ns.substring(with: match.range(at: 2)) : ""
-                var info = SpouseInfo(name: cleanText(name) ?? name)
+                let wt = extractWikiTitle(from: nameRaw)
+                var info = SpouseInfo(name: cleanText(nameRaw) ?? nameRaw, wikiTitle: wt)
                 if !startDate.isEmpty { info.marriageDate = DateParser.parse(startDate) }
                 spouses.append(info)
             }
         }
 
         if spouses.isEmpty {
-            // Plain text / wikilinks
-            let cleaned = parseList(s)
-            spouses = cleaned.map { SpouseInfo(name: $0) }
+            // Plain text / wikilinks — extract wikiTitle before cleaning
+            var t = s
+            t = t.replacingOccurrences(of: #"<br\s*/?>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+            spouses = t.components(separatedBy: .newlines).compactMap { raw -> SpouseInfo? in
+                let wt = extractWikiTitle(from: raw)
+                guard let name = cleanText(raw) else { return nil }
+                let clean = name.replacingOccurrences(of: #"^\s*[\*\-\•]\s*"#, with: "", options: .regularExpression)
+                guard !clean.isEmpty && !clean.hasPrefix("|") && !clean.hasSuffix("|") && !clean.contains("={{") else { return nil }
+                return SpouseInfo(name: clean, wikiTitle: wt)
+            }
         }
 
         return spouses

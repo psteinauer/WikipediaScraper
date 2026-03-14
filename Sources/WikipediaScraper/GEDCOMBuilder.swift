@@ -45,24 +45,69 @@ private struct BuildContext {
     var childOnlyFamID: String?  = nil
     var parentFamID:    String?  = nil
 
+    // Full-person tracking (parallel arrays)
+    var spouseIsFullPerson:  [Bool] = []   // parallel to spouseIndiIDs
+    var childIsFullPerson:   [Bool] = []   // parallel to childrenIndiIDs
+    var fatherIsFullPerson:  Bool   = false
+    var motherIsFullPerson:  Bool   = false
+    var spouseIsNewFam:      [Bool] = []   // true = this context creates the FAM record
+    var parentFamIsNew:      Bool   = true // true = this context creates the parent FAM record
+
     // Influential persons (ASSO)
     var assocLinks: [AssocLink] = []
     var assocStubs: [AssocStub] = []
 
     init(from person: PersonData, sourID: String,
+         personRegistry: [String: String],
+         familyRegistry: inout [String: String],
          nextI: inout Int, nextF: inout Int, nextO: inout Int) {
-        self.mainIndiID = "@I\(nextI)@"; nextI += 1
-        self.sourID     = sourID
 
-        // One FAM + one spouse INDI per listed spouse
-        for _ in person.spouses {
-            spouseIndiIDs.append("@I\(nextI)@"); nextI += 1
-            spouseFamIDs .append("@F\(nextF)@"); nextF += 1
+        // Main INDI ID — look up in personRegistry first
+        self.mainIndiID = personRegistry[person.wikiTitle ?? ""]
+                       ?? personRegistry[person.name ?? ""]
+                       ?? { let id = "@I\(nextI)@"; nextI += 1; return id }()
+        self.sourID = sourID
+
+        // Spouses — look up in registry, create/find FAM via familyRegistry
+        for spouse in person.spouses {
+            let spouseID: String
+            let isFull: Bool
+            if let wt = spouse.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
+                spouseID = id; isFull = true
+            } else if !spouse.name.isEmpty, let id = personRegistry[spouse.name] {
+                spouseID = id; isFull = true
+            } else {
+                spouseID = "@I\(nextI)@"; nextI += 1; isFull = false
+            }
+            spouseIndiIDs.append(spouseID)
+            spouseIsFullPerson.append(isFull)
+
+            // FAM deduplication
+            let sortedPair = [mainIndiID, spouseID].sorted().joined(separator: "+")
+            if let existingFam = familyRegistry[sortedPair] {
+                spouseFamIDs.append(existingFam)
+                spouseIsNewFam.append(false)
+            } else {
+                let famID = "@F\(nextF)@"; nextF += 1
+                familyRegistry[sortedPair] = famID
+                spouseFamIDs.append(famID)
+                spouseIsNewFam.append(true)
+            }
         }
 
-        // Children stubs
-        for _ in person.children {
-            childrenIndiIDs.append("@I\(nextI)@"); nextI += 1
+        // Children — look up in registry
+        for child in person.children {
+            let childID: String
+            let isFull: Bool
+            if let wt = child.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
+                childID = id; isFull = true
+            } else if !child.name.isEmpty, let id = personRegistry[child.name] {
+                childID = id; isFull = true
+            } else {
+                childID = "@I\(nextI)@"; nextI += 1; isFull = false
+            }
+            childrenIndiIDs.append(childID)
+            childIsFullPerson.append(isFull)
         }
 
         // If children but no spouse: extra FAMS
@@ -70,15 +115,51 @@ private struct BuildContext {
             childOnlyFamID = "@F\(nextF)@"; nextF += 1
         }
 
-        // Parent family
-        let hasParents = person.father != nil || person.mother != nil || !person.parents.isEmpty
+        // Parent family — look up in registry, use familyRegistry for FAM dedup
+        let fatherRef = person.father ?? person.parents.first
+        let motherRef = person.mother ?? (person.parents.count >= 2 ? person.parents[1] : nil)
+        let hasParents = fatherRef != nil || motherRef != nil
+
         if hasParents {
-            parentFamID = "@F\(nextF)@"; nextF += 1
-            if person.father != nil || !person.parents.isEmpty {
-                fatherIndiID = "@I\(nextI)@"; nextI += 1
+            var fid: String? = nil
+            var fFull = false
+            if let fr = fatherRef {
+                if let wt = fr.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
+                    fid = id; fFull = true
+                } else if !fr.name.isEmpty, let id = personRegistry[fr.name] {
+                    fid = id; fFull = true
+                } else {
+                    fid = "@I\(nextI)@"; nextI += 1
+                }
             }
-            if person.mother != nil || person.parents.count >= 2 {
-                motherIndiID = "@I\(nextI)@"; nextI += 1
+            var mid: String? = nil
+            var mFull = false
+            if let mr = motherRef {
+                if let wt = mr.wikiTitle, !wt.isEmpty, let id = personRegistry[wt] {
+                    mid = id; mFull = true
+                } else if !mr.name.isEmpty, let id = personRegistry[mr.name] {
+                    mid = id; mFull = true
+                } else {
+                    mid = "@I\(nextI)@"; nextI += 1
+                }
+            }
+
+            fatherIndiID = fid
+            motherIndiID = mid
+            fatherIsFullPerson = fFull
+            motherIsFullPerson = mFull
+
+            // FAM deduplication for parent family
+            let a = fid ?? "_nil_"
+            let b = mid ?? "_nil_"
+            let sortedParentPair = [a, b].sorted().joined(separator: "+")
+            if let existingFam = familyRegistry[sortedParentPair] {
+                parentFamID = existingFam
+                parentFamIsNew = false
+            } else {
+                parentFamID = "@F\(nextF)@"; nextF += 1
+                familyRegistry[sortedParentPair] = parentFamID!
+                parentFamIsNew = true
             }
         }
 
@@ -122,25 +203,39 @@ struct GEDCOMBuilder {
     mutating func build(persons: [PersonData], verbose: Bool) -> String {
         lines = []
 
-        // ── Allocate source IDs (one per unique base URL) ──────────────────
-        var sourIDs: [String: String] = [:]   // baseURL → @Sx@
+        // ── Allocate source IDs ────────────────────────────────────────────────
+        var sourIDs: [String: String] = [:]
         var nextS = 1
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             if sourIDs[base] == nil { sourIDs[base] = "@S\(nextS)@"; nextS += 1 }
         }
 
-        // ── Allocate all record IDs ────────────────────────────────────────
+        // ── Pre-allocate main INDI IDs for all persons ─────────────────────────
+        // Build personRegistry before constructing contexts so cross-references
+        // between persons in the list resolve to the correct pre-allocated IDs.
+        var personRegistry: [String: String] = [:]  // wikiTitle/name → mainIndiID
         var nextI = 1, nextF = 1, nextO = 1
-        var contexts: [BuildContext] = []
         for person in persons {
-            let base  = baseURL(from: person.wikiURL ?? "")
-            let sID   = sourIDs[base] ?? "@S1@"
-            contexts.append(BuildContext(from: person, sourID: sID,
-                                         nextI: &nextI, nextF: &nextF, nextO: &nextO))
+            let id = "@I\(nextI)@"; nextI += 1
+            if let wt = person.wikiTitle, !wt.isEmpty { personRegistry[wt] = id }
+            // Also register by display name as fallback (don't overwrite a wiki-title match)
+            if let nm = person.name, !nm.isEmpty, personRegistry[nm] == nil { personRegistry[nm] = id }
         }
 
-        // ── Write records ──────────────────────────────────────────────────
+        // ── Build contexts with shared registries ──────────────────────────────
+        var familyRegistry: [String: String] = [:]   // sorted-pair key → famID
+        var contexts: [BuildContext] = []
+        for person in persons {
+            let base = baseURL(from: person.wikiURL ?? "")
+            let sID  = sourIDs[base] ?? "@S1@"
+            contexts.append(BuildContext(from: person, sourID: sID,
+                                          personRegistry: personRegistry,
+                                          familyRegistry: &familyRegistry,
+                                          nextI: &nextI, nextF: &nextF, nextO: &nextO))
+        }
+
+        // ── Write records ──────────────────────────────────────────────────────
         writeHeader(persons: persons)
 
         for (person, ctx) in zip(persons, contexts) {
@@ -334,6 +429,7 @@ struct GEDCOMBuilder {
 
         for (i, spouse) in person.spouses.enumerated() {
             guard i < ctx.spouseIndiIDs.count else { continue }
+            guard !ctx.spouseIsFullPerson[i] else { continue }   // skip full persons
             let indi = ctx.spouseIndiIDs[i]
             let fam  = ctx.spouseFamIDs[i]
 
@@ -358,11 +454,12 @@ struct GEDCOMBuilder {
 
         for (i, child) in person.children.enumerated() {
             guard i < ctx.childrenIndiIDs.count else { continue }
+            guard !ctx.childIsFullPerson[i] else { continue }   // skip full persons
             let indi = ctx.childrenIndiIDs[i]
 
             line(0, "\(indi) INDI")
-            let (g, s) = splitGivenSurname(child)
-            line(1, "NAME \(gedcomName(given: g, surname: s, full: child))")
+            let (g, s) = splitGivenSurname(child.name)
+            line(1, "NAME \(gedcomName(given: g, surname: s, full: child.name))")
             if !g.isEmpty { line(2, "GIVN \(g)") }
             if !s.isEmpty { line(2, "SURN \(s)") }
             if let f = childFamID { line(1, "FAMC \(f)") }
@@ -374,22 +471,22 @@ struct GEDCOMBuilder {
     private mutating func writeParentStubs(person: PersonData, ctx: BuildContext) {
         guard let pfam = ctx.parentFamID else { return }
 
-        let fatherName = person.father ?? person.parents.first
-        if let fn = fatherName, let fid = ctx.fatherIndiID {
+        let fatherRef = person.father ?? person.parents.first
+        if let fr = fatherRef, let fid = ctx.fatherIndiID, !ctx.fatherIsFullPerson {
             line(0, "\(fid) INDI")
-            let (g, s) = splitGivenSurname(fn)
-            line(1, "NAME \(gedcomName(given: g, surname: s, full: fn))")
+            let (g, s) = splitGivenSurname(fr.name)
+            line(1, "NAME \(gedcomName(given: g, surname: s, full: fr.name))")
             if !g.isEmpty { line(2, "GIVN \(g)") }
             if !s.isEmpty { line(2, "SURN \(s)") }
             line(1, "SEX M")
             line(1, "FAMS \(pfam)")
         }
 
-        let motherName = person.mother ?? (person.parents.count >= 2 ? person.parents[1] : nil)
-        if let mn = motherName, let mid = ctx.motherIndiID {
+        let motherRef = person.mother ?? (person.parents.count >= 2 ? person.parents[1] : nil)
+        if let mr = motherRef, let mid = ctx.motherIndiID, !ctx.motherIsFullPerson {
             line(0, "\(mid) INDI")
-            let (g, s) = splitGivenSurname(mn)
-            line(1, "NAME \(gedcomName(given: g, surname: s, full: mn))")
+            let (g, s) = splitGivenSurname(mr.name)
+            line(1, "NAME \(gedcomName(given: g, surname: s, full: mr.name))")
             if !g.isEmpty { line(2, "GIVN \(g)") }
             if !s.isEmpty { line(2, "SURN \(s)") }
             line(1, "SEX F")
@@ -404,6 +501,8 @@ struct GEDCOMBuilder {
 
         for (i, spouse) in person.spouses.enumerated() {
             guard i < ctx.spouseFamIDs.count, i < ctx.spouseIndiIDs.count else { continue }
+            guard ctx.spouseIsNewFam[i] else { continue }   // only write FAM once
+
             let famID    = ctx.spouseFamIDs[i]
             let spouseID = ctx.spouseIndiIDs[i]
 
@@ -443,7 +542,7 @@ struct GEDCOMBuilder {
             line(1, "SOUR \(ctx.sourID)")
         }
 
-        if let pfam = ctx.parentFamID {
+        if let pfam = ctx.parentFamID, ctx.parentFamIsNew {   // only write parent FAM once
             line(0, "\(pfam) FAM")
             if let fid = ctx.fatherIndiID { line(1, "HUSB \(fid)") }
             if let mid = ctx.motherIndiID { line(1, "WIFE \(mid)") }
