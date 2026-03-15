@@ -20,6 +20,11 @@ This document covers the software architecture, data-flow pipelines, and module 
 4. [Shared UI Library — WikipediaScraperSharedUI](#4-shared-ui-library--wikipediascrapersharedui)
    - [EditableTypes](#41-editabletypes)
    - [PersonEditorView](#42-personeditorview)
+   - [FetchOptionsView](#43-fetchoptionsview)
+   - [LLMSettings](#44-llmsettings)
+   - [SourceInfo and SourceDetailView](#45-sourceinfo-and-sourcedetailview)
+   - [AIProgressSheet](#46-aiprogresssheet)
+   - [GEDCOMPreviewSheet](#47-gedcompreviewsheet)
 5. [CLI Tool — WikipediaScraper](#5-cli-tool--wikipediascraper)
    - [Entry Point and Argument Parsing](#51-entry-point-and-argument-parsing)
    - [CLI Data Flow](#52-cli-data-flow)
@@ -32,6 +37,7 @@ This document covers the software architecture, data-flow pipelines, and module 
    - [PersonViewModel](#63-personviewmodel)
    - [ContentView](#64-contentview)
    - [Export Paths](#65-export-paths)
+   - [LLMSettingsView](#66-llmsettingsview)
 7. [iPadOS App — WikipediaScraperIPad](#7-ipados-app--wikipediascraperipad)
    - [Scene Setup](#71-scene-setup)
    - [Platform Compilation Strategy](#72-platform-compilation-strategy)
@@ -70,15 +76,27 @@ WikipediaScraper/
 │   │
 │   ├── WikipediaScraperSharedUI/      SwiftUI library — shared by macOS + iPadOS apps
 │   │   ├── EditableTypes.swift        Editable model wrappers (EditablePerson, etc.)
-│   │   └── PersonEditorView.swift     PersonEditorView, EventSectionContent, MediaThumbnail
+│   │   ├── PersonEditorView.swift     Card-based editor: EditorSection, SubGroup, FieldRow,
+│   │   │                              EventSectionContent, MediaThumbnail, image cells
+│   │   ├── FetchOptionsView.swift     Fetch-option toggles (Notes, All Images, Main Person Only,
+│   │   │                              AI Analysis + API key); macOS=card, iOS=chip strip
+│   │   ├── LLMSettings.swift          Shared singleton (ObservableObject) persisting AI toggle
+│   │   │                              and Anthropic API key to UserDefaults
+│   │   ├── SourceInfo.swift           SourceInfo struct — Wikipedia / Claude AI source metadata
+│   │   ├── SourceDetailView.swift     Detail view for a selected SourceInfo
+│   │   ├── URLListBar.swift           Reusable URL chip bar (iPad)
+│   │   ├── AIProgressSheet.swift      Sheet showing per-article AI analysis progress
+│   │   └── GEDCOMPreviewSheet.swift   Sheet with syntax-highlighted GEDCOM preview + copy/save
 │   │
 │   ├── WikipediaScraper/              CLI executable target
 │   │   └── WikipediaScraperCommand.swift
 │   │
 │   ├── WikipediaScraperApp/           macOS SwiftUI app target
 │   │   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
-│   │   ├── ContentView.swift          URL bar, toolbar, window layout
-│   │   ├── PersonViewModel.swift      ViewModel — fetch + NSSavePanel export
+│   │   ├── ContentView.swift          URL chip bar, NavigationSplitView, sidebar, detail
+│   │   ├── PersonViewModel.swift      ViewModel — multi-person fetch, NSSavePanel export,
+│   │   │                              MacFamilyTree integration, GEDCOM preview
+│   │   ├── LLMSettingsView.swift      macOS Settings popover — AI toggle + API key
 │   │   ├── Info.plist
 │   │   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
 │   │
@@ -135,10 +153,13 @@ All public types in `WikipediaScraperCore` and `WikipediaScraperSharedUI` carry 
 ┌──────────────────────────┼───────────────────────────────────────┐
 │           WikipediaScraperSharedUI                               │
 │                          │                                       │
-│         EditableTypes ◄──┤──► PersonEditorView                  │
-│         (EditablePerson, │    (Form, MediaThumbnail,             │
-│          EditableEvent,  │     EventSectionContent)              │
-│          …)              │                                       │
+│  EditableTypes ◄─────────┤──► PersonEditorView                  │
+│  (EditablePerson, …)     │    (EditorSection cards, SubGroup,    │
+│                          │     FieldRow, MediaThumbnail)         │
+│  LLMSettings.shared      │──► FetchOptionsView                  │
+│  (ObservableObject)      │    SourceInfo / SourceDetailView      │
+│  LLMClient               │    AIProgressSheet                    │
+│                          │    GEDCOMPreviewSheet                 │
 └──────────────────────────┼───────────────────────────────────────┘
                            │
           ┌────────────────┼──────────────────┐
@@ -148,9 +169,10 @@ All public types in `WikipediaScraperCore` and `WikipediaScraperSharedUI` carry 
   AsyncParsable      PersonViewModel      iPadPersonViewModel
   Command            ContentView          iPadContentView
                      NSSavePanel          .fileExporter
+                     LLMSettingsView
 ```
 
-All three consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The macOS and iPadOS apps share the `EditableTypes` and `PersonEditorView` from `WikipediaScraperSharedUI`; they differ only in their export mechanisms and window setup.
+All three consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The macOS and iPadOS apps share `EditableTypes`, `PersonEditorView`, `FetchOptionsView`, `LLMSettings`, and the AI/preview sheet components from `WikipediaScraperSharedUI`; they differ only in their export mechanisms, window setup, and settings UI.
 
 ---
 
@@ -536,7 +558,7 @@ The file uses a simple INI-like format: blank lines and `#`/`;`-prefixed lines a
 
 **Directory:** `Sources/WikipediaScraperSharedUI/`
 
-A SwiftUI library target that compiles for both macOS 13 and iOS 16. It contains everything shared between the macOS and iPadOS apps: the editable model layer and the main editor view hierarchy. Platform-specific colours are handled with `#if os(macOS)` / `#else` guards at the top of each file.
+A SwiftUI library target that compiles for both macOS 13 and iOS 16. It contains everything shared between the macOS and iPadOS apps: the editable model layer, the main editor view hierarchy, fetch-option controls, AI analysis infrastructure, GEDCOM preview, and source metadata. Platform-specific colours and layouts are handled with `#if os(macOS)` / `#else` guards.
 
 ### 4.1 EditableTypes
 
@@ -546,6 +568,8 @@ The editable types mirror the `PersonModel` types but use plain `String` fields 
 
 ```
 EditablePerson
+├── id: UUID                            ← stable identity for List selection
+├── isStub: Bool                        ← true for referenced-person stubs
 ├── givenName / surname / birthName / sex
 ├── birth / death / burial / baptism : EditableEvent
 │       └── date (String) / place / note / cause
@@ -565,7 +589,16 @@ EditablePerson
 ├── imageURL : String                       ← primary image URL
 ├── additionalMedia : [EditableMediaItem]
 │       └── url (String) / caption (String)
-└── wikiTitle / wikiURL / wikiExtract       ← read-only metadata
+│
+├── LLM-enriched fields (populated by LLMClient.analyze)
+│   ├── llmAlternateNames : [String]
+│   ├── llmTitles         : [String]
+│   ├── llmFacts          : [EditablePersonFact]
+│   ├── llmEvents         : [EditableCustomEvent]
+│   └── influentialPeople : [InfluentialPerson]
+│           └── name / wikiTitle / relationship / note
+│
+└── wikiTitle / wikiURL / wikiExtract / wikiSections   ← metadata
 ```
 
 Each editable type provides:
@@ -579,42 +612,151 @@ Each editable type provides:
 
 **File:** `Sources/WikipediaScraperSharedUI/PersonEditorView.swift`
 
-`public struct PersonEditorView: View` — `Form { … }.formStyle(.grouped)`. All 14 sections are extracted to computed `@ViewBuilder` properties for readability. No business logic; entirely driven by `@Binding var person: EditablePerson`.
+`public struct PersonEditorView: View` — a `ScrollView` containing a vertical stack of collapsible `EditorSection` cards. No business logic; entirely driven by `@Binding var person: EditablePerson`.
 
-**Sections in order:**
+#### Card-based layout
 
-| Section | Key controls |
-|---------|-------------|
-| Identity | `TextField` for names; `Picker(.segmented)` for sex |
-| Media | `AsyncImage` thumbnails + URL `TextField`; add/remove additional media |
-| Birth / Death / Burial / Baptism | `EventSectionContent` sub-view |
-| Titled Positions | Expandable rows — all fields editable including type |
-| Custom Events | Expandable rows — event type is a `TextField` |
-| Facts | Two-column `TextField` rows — both type and value editable |
-| Honorifics | Single `TextField` rows |
-| Spouses | Expandable rows |
-| Children | `TextField` list |
-| Parents | `TextField` for father, mother |
-| Occupations | `TextField` list |
-| Other | `TextField` for nationality, religion |
+The editor replaces the earlier `Form { … }.formStyle(.grouped)` approach with custom card components:
 
-**Supporting types (also public):**
+| Component | Role |
+|-----------|------|
+| `EditorSection` | Top-level collapsible card — SF Symbol icon + bold title header with disclosure chevron; content inside a rounded rectangle with shadow and 0.5 pt border |
+| `SubGroup` | Second-level collapsible group inside a section — smaller chevron header, content indented 18 pt |
+| `FieldRow` | Two-column field row — right-aligned label at 120 pt, content fills the remainder; optional inset divider |
+| `EventSectionContent` | Reusable Date/Place/Note/Cause field set for life events |
 
-`EventSectionContent` — reusable sub-view for any life event (date/place/note/cause fields). Used by all four life-event sections.
+`EditorSection` stores `Content` directly (not as a closure):
+```swift
+private struct EditorSection<Content: View>: View {
+    init(_ title: String, systemImage: String,
+         isExpanded: Binding<Bool>,
+         @ViewBuilder content: () -> Content) {
+        self.content = content()   // evaluated once in init
+        …
+    }
+}
+```
+This avoids the Swift compile error about storing a non-escaping `@ViewBuilder` closure.
 
-`MediaThumbnail` — `AsyncImage`-based thumbnail with all loading phases handled. Uses `NSColor`/`UIColor` conditionally for separator and background colours:
+#### Sections in order
+
+| Section key | SF Symbol | Contents |
+|-------------|-----------|---------|
+| `"Name and Gender"` | `person.text.rectangle` | Given name, surname, birth name, sex picker; primary image shown to the right (fit-to-height, aspect-preserving) when image URL is set |
+| `"Media"` | `photo.stack` | Horizontally-scrolling thumbnail grid — primary image cell (star badge, edit popover), additional media cells with caption overlay; add button |
+| `"Events"` | `calendar` | Birth, Death, Burial, Baptism sub-groups; Spouses, Titled Positions, Custom Events sub-groups |
+| `"Facts"` | `list.bullet.rectangle` | Honorifics, Occupations, Custom Facts sub-groups |
+| `"Attributes"` | `tag` | Nationality, religion |
+| `"Other"` | `person.2` | Father, mother, children |
+| `"AI Analysis"` | `wand.and.stars` | LLM alternate names, additional titles, facts, events, influential people (read-only display) |
+| `"Sources"` | `doc.text.magnifyingglass` | Wikipedia extract, article URL |
+
+#### Expand / collapse behaviour
+
+Expand/collapse state is tracked in `@State private var expandedSections: Set<String>`, initialised to `["Name and Gender"]` so only that section is open by default.
+
+The `isExpanded(for:)` binding setter implements three modifier-key behaviours (macOS only):
+
+| Modifier | Behaviour |
+|----------|-----------|
+| None | Toggle just this section |
+| ⌥ Option | Toggle this section **and all its sub-sections** |
+| ⌘⌥ Cmd+Option | Toggle **all other top-level sections** (without changing their sub-section states) |
+
+Sub-section keys follow the pattern `"SectionName.SubName"` (e.g. `"Events.Birth"`). The static dictionary `PersonEditorView.subSections` maps each top-level key to its sub-section key list.
+
+#### Primary image beside Name and Gender
+
+When `person.imageURL` is non-empty and `"Name and Gender"` is expanded, `MediaThumbnail(urlString:height:)` (fit-to-height mode) is placed in an `HStack` to the right of the name card. The card height is measured once via an `overlay { GeometryReader }` on first appearance and stored in `@State private var nameCardHeight: CGFloat = 160`.
+
+#### MediaThumbnail
+
+`public struct MediaThumbnail: View` — custom async image loader backed by a shared `NSCache` / `NSImage` (macOS) or `UIImage` (iOS) cache. Two initialisers:
 
 ```swift
-#if os(macOS)
-import AppKit
-private var separatorColor:   Color { Color(NSColor.separatorColor) }
-private var thumbnailBGColor: Color { Color(NSColor.unemphasizedSelectedContentBackgroundColor) }
-#else
-import UIKit
-private var separatorColor:   Color { Color(UIColor.separator) }
-private var thumbnailBGColor: Color { Color(UIColor.secondarySystemBackground) }
-#endif
+// Fixed rect — fills the given width×height (crops if needed)
+init(urlString: String, width: CGFloat = 72, height: CGFloat = 90)
+
+// Fit-to-height — preserves image aspect ratio at the given height
+init(urlString: String, height: CGFloat)
 ```
+
+Loading phases: `.idle` → `.loading` → `.success(Image)` | `.failure`. Cancelled tasks (when the person changes mid-load) reset to `.idle` so the task re-runs cleanly on re-navigation.
+
+### 4.3 FetchOptionsView
+
+**File:** `Sources/WikipediaScraperSharedUI/FetchOptionsView.swift`
+
+`public struct FetchOptionsView: View` — compact option strip providing four toggles:
+
+| Toggle | Binding | Effect |
+|--------|---------|--------|
+| AI Analysis | `LLMSettings.shared.isEnabled` | Run Claude AI enrichment after fetch |
+| Notes | `$useNotes` | Include Wikipedia article sections as GEDCOM notes |
+| All Images | `$useAllImages` | Download all article images into ZIP export |
+| Main Person Only | `$noPeople` | Strip family stubs from the output |
+
+**macOS:** Renders as a rounded card (`NSColor.windowBackgroundColor` background, 10 pt corner radius, 0.5 pt border, drop shadow) with a "Fetch Options" header, a divider, and a vertical list of `Toggle(.checkbox)` controls. When AI Analysis is enabled, an API key `SecureField` appears below the toggles.
+
+**iPadOS:** Renders as a horizontally-scrollable row of `Toggle(.button).buttonBorderShape(.capsule)` chips. The API key field appears below the row when AI Analysis is enabled.
+
+### 4.4 LLMSettings
+
+**File:** `Sources/WikipediaScraperSharedUI/LLMSettings.swift`
+
+```swift
+public final class LLMSettings: ObservableObject {
+    public static let shared = LLMSettings()
+    @Published public var isEnabled: Bool   // UserDefaults key: "llm_enabled"
+    @Published public var apiKey:    String // UserDefaults key: "anthropic_api_key"
+}
+```
+
+Singleton accessed via `LLMSettings.shared`. Changes persist to `UserDefaults` immediately via `didSet`. Used by `FetchOptionsView`, `LLMSettingsView`, and `PersonViewModel`.
+
+### 4.5 SourceInfo and SourceDetailView
+
+**Files:** `Sources/WikipediaScraperSharedUI/SourceInfo.swift`, `SourceDetailView.swift`
+
+`SourceInfo` is a plain value type representing one data source:
+
+```swift
+public struct SourceInfo: Identifiable {
+    public enum SourceType { case wikipedia, claudeAI }
+    public let id: UUID          // stable well-known IDs for wikipedia and claudeAI
+    public let type: SourceType
+    public let name: String
+    public let icon: String      // SF Symbol name
+    public let description: String
+    public let citedByNames: [String]  // wikiTitle strings of persons citing this source
+}
+```
+
+Two well-known IDs are defined as constants (`SourceInfo.wikipediaID`, `SourceInfo.claudeAIID`). `PersonViewModel.sources` computes the active source list by inspecting the current `persons` array.
+
+`SourceDetailView` renders the description text, cited-by list, and a link to the source website in a read-only detail panel.
+
+### 4.6 AIProgressSheet
+
+**File:** `Sources/WikipediaScraperSharedUI/AIProgressSheet.swift`
+
+A `.sheet` presented while AI analysis is running. Displays one row per article with a progress spinner (or checkmark/X when complete) and an expandable list of streaming step messages received from `LLMClient.analyze(onProgress:)`.
+
+```swift
+public struct AIProgressEntry: Identifiable {
+    public var id: UUID
+    public var title:   String        // Wikipedia article title
+    public var steps:   [String]      // incremental messages from the LLM
+    public var isDone:  Bool
+    public var failed:  Bool
+}
+```
+
+### 4.7 GEDCOMPreviewSheet
+
+**File:** `Sources/WikipediaScraperSharedUI/GEDCOMPreviewSheet.swift`
+
+A `.sheet` with a scrollable, monospaced display of the generated GEDCOM text. Provides toolbar buttons to copy the text to the clipboard and to save it to a file (via `NSSavePanel` on macOS or a share sheet on iPadOS). The sheet is triggered by `vm.showingGEDCOMPreview = true` after export or via the "View GEDCOM…" menu item.
 
 ---
 
@@ -760,10 +902,10 @@ This runs before `GEDCOMBuilder.build()`, so the builder never sees the stripped
 struct WikipediaScraperApp: App {
     var body: some Scene {
         WindowGroup {
-            NavigationStack { ContentView() }
+            ContentView()
                 .frame(minWidth: 820, minHeight: 560)
         }
-        .defaultSize(width: 960, height: 720)
+        .defaultSize(width: 1040, height: 740)
         .commands {
             CommandGroup(replacing: .newItem) {}
             AppCommands()
@@ -771,8 +913,6 @@ struct WikipediaScraperApp: App {
     }
 }
 ```
-
-`NavigationStack` provides a window title bar that updates via `.navigationTitle()` and standard toolbar chrome.
 
 `AppCommands` wires the active window's `PersonViewModel` into the macOS menu bar using SwiftUI's focused-value system:
 
@@ -784,43 +924,51 @@ struct WikipediaScraperApp: App {
 @FocusedValue(\.personViewModel) private var vm: PersonViewModel?
 ```
 
-This allows File > Export as GEDCOM… (⌘E) and File > Export as ZIP… (⌘⇧E) to operate on whichever window is currently focused.
+This allows File > Export as GEDCOM… and File > Export as ZIP… to operate on whichever window is currently focused.
 
 ### 6.2 App Data Flow
 
 ```
-User pastes URL → ContentView.urlBar
+User clicks + in URL chip bar → AddURLSheet → vm.addURL()
         │
-        ▼ vm.fetch() called
-PersonViewModel.fetch()
+        ▼ ⌘↩ or fetch button pressed → vm.fetch()
+PersonViewModel.fetch()   (loops over all URLs)
         │
-        ├─ WikipediaClient.pageTitle(from: urlString)
-        ├─ WikipediaClient.fetchSummary()        ─────┐ concurrent
-        ├─ WikipediaClient.fetchWikitext()        ────┘ async let
+        for each URL:
+        ├─ WikipediaClient.pageTitle(from: url)
+        ├─ WikipediaClient.fetchSummary()   ─────┐ concurrent async let
+        ├─ WikipediaClient.fetchWikitext()  ─────┘
         │
         ├─ InfoboxParser.parse(wikitext:pageTitle:)
+        ├─ EditablePerson(from: parsedPerson)
+        │    + merge summary.title, extract, imageURL
         │
-        └─ EditablePerson(from: parsedPerson)
-                │  merge summary title, extract, imageURL
-                └─► vm.person = editable
-                    vm.hasData = true
-                           │
-                           ▼
-                 PersonEditorView renders
-                 all fields as TextFields
-                 with bindings to vm.person
-                           │
-                           ▼ user edits
-                 vm.person mutated in place
-                           │
-                           ▼ File > Export
-                 person.toPersonData()  →  PersonData
-                 GEDCOMBuilder.build()  →  GEDCOM text
-                           │
-                 ┌─────────┴──────────┐
-                 │ .ged               │ .zip
-                 │ NSSavePanel        │ fetchImageData() × N
-                 │ write to URL       │ GEDZIPBuilder.create()
+        ├─ (if useNotes)     WikipediaClient.fetchSections()
+        ├─ (if useAllImages) WikipediaClient.fetchAllImageURLs()
+        │
+        └─ (if LLMSettings.shared.isEnabled)
+              LLMClient.analyze(pageTitle:wikitext:extract:apiKey:onProgress:)
+              → editable.llmAlternateNames / llmTitles / llmFacts / llmEvents / influentialPeople
+              → AIProgressSheet streams live messages
+        │
+        ├─ upsert into vm.persons (replace stub/existing by wikiTitle, else append)
+        └─ vm.selectedPersonID = editable.id
+                │
+                ▼
+    rebuildStubs() — adds minimal EditablePerson stubs for referenced family members
+                │
+                ▼ ContentView detail column shows PersonEditorView
+    person fields editable as TextFields via @Binding
+                │
+                ▼ Export button / File menu
+    persons.filter(!isStub).map(toPersonData())
+    GEDCOMBuilder.build(persons:)  →  GEDCOM text
+                │
+        ┌───────┴──────────────┬──────────────────┐
+        │ .ged                 │ .zip / MFT        │ preview
+        │ NSSavePanel          │ fetch images      │ GEDCOMPreviewSheet
+        │ write to URL         │ GEDZIPBuilder     │ (no file I/O)
+                               │ [open in MFT 11]
 ```
 
 ### 6.3 PersonViewModel
@@ -829,61 +977,115 @@ PersonViewModel.fetch()
 
 `@MainActor final class PersonViewModel: ObservableObject`
 
-The ViewModel holds the in-flight URL string, the parsed/edited person (as `EditablePerson` from `WikipediaScraperSharedUI`), loading/error/status state, and drives all network and file I/O. Export uses `NSSavePanel` for the native macOS save dialog.
+#### Published properties
 
-#### saveAsZip workflow
+| Property | Type | Description |
+|----------|------|-------------|
+| `urls` | `[String]` | Wikipedia article URLs — persisted to `UserDefaults("url_list")` |
+| `persons` | `[EditablePerson]` | All fetched persons plus stubs; drives the sidebar list |
+| `selectedPersonID` | `UUID?` | Currently selected person in the sidebar |
+| `isLoading` | `Bool` | True while any URL is being fetched |
+| `errorMessage` | `String?` | Shown in the sidebar error banner |
+| `statusMessage` | `String?` | Shown in the toolbar while loading |
+| `mediaWarnings` | `[String]` | Per-image download failure messages; shown in an alert |
+| `aiProgressEntries` | `[AIProgressEntry]` | Streamed AI analysis steps per article |
+| `showingAIProgress` | `Bool` | Triggers `AIProgressSheet` |
+| `gedcomPreviewText` | `String?` | GEDCOM text for the preview sheet |
+| `showingGEDCOMPreview` | `Bool` | Triggers `GEDCOMPreviewSheet` |
+| `useNotes` | `Bool` | Persisted fetch option |
+| `useAllImages` | `Bool` | Persisted fetch option |
+| `noPeople` | `Bool` | Persisted fetch option; changing triggers `rebuildStubs()` |
+
+#### Key computed / derived state
 
 ```swift
-func saveAsZip() async {
-    // NSSavePanel (async continuation pattern)
-    // ──────────────────────────────────────────
-    // 1. Fetch primary image:
-    //    WikipediaClient.fetchImageData(from: person.imageURL)
-    //    → build relative path "media/<safeName>.<ext>"
-    //    → personData.imageFilePath = relPath
-    //    → mediaFiles.append((relPath, data))
-    //
-    // 2. For each EditableMediaItem in person.additionalMedia:
-    //    WikipediaClient.fetchImageData(from: item.url)
-    //    → build relative path from item.caption or index
-    //    → resolvedExtras.append(AdditionalMedia(filePath: relPath, …))
-    //    → mediaFiles.append((relPath, data))
-    //    (on fetch failure: fall back to URL reference, no embedded data)
-    //
-    // 3. personData.additionalMedia = resolvedExtras
-    // 4. GEDCOMBuilder.build(persons: [personData])
-    // 5. GEDZIPBuilder.create(gedcom:mediaFiles:at:)
-}
+var hasData: Bool { persons.contains { !$0.isStub } }
+
+var sources: [SourceInfo] { … }
+// Computes SourceInfo.wikipedia (if any non-stub has wikiURL/wikiTitle)
+// and SourceInfo.claudeAI (if any non-stub has llm* or influentialPeople).
+
+func selectedPersonBinding() -> Binding<EditablePerson>?
+// Returns a live Binding into persons[id] for the selected person.
 ```
+
+#### `rebuildStubs()`
+
+Called after every fetch and whenever `noPeople` changes. When `noPeople == false`, extracts all referenced names (spouses, children, father, mother, titledPositions predecessors/successors, influentialPeople) from full (non-stub) persons and creates minimal `EditablePerson` stubs for any not already present in `persons`. When `noPeople == true`, removes all stubs.
+
+#### Export workflows
+
+**`saveAsGED()`** — `NSSavePanel` → `persons.filter(!isStub).map(toPersonData())` → `GEDCOMBuilder.build()` → `String.write(to:)`. After saving, sets `gedcomPreviewText` and opens `GEDCOMPreviewSheet`.
+
+**`saveAsZip()` / `openInMacFamilyTree()`** — both delegate to `buildAndWriteZip(to:)`:
+
+```
+for each non-stub person:
+    fetch primaryImage → "media/<title>.<ext>"
+    for each additionalMedia item: fetch → "media/<title>_N.<ext>"
+    (failures appended to mediaWarnings)
+
+GEDCOMBuilder.build(persons: personDatas)
+GEDZIPBuilder.create(gedcom:mediaFiles:at:)
+```
+
+`openInMacFamilyTree()` writes to a `FileManager.temporaryDirectory` URL then launches MacFamilyTree 11 via `/usr/bin/open -a "MacFamilyTree 11.app" <tempURL>`.
+
+**`previewGEDCOM()`** — builds GEDCOM without saving; sets `gedcomPreviewText` and opens preview sheet.
 
 ### 6.4 ContentView
 
 **File:** `Sources/WikipediaScraperApp/ContentView.swift`
 
-Thin layout shell. All business logic lives in `PersonViewModel`.
+Thin layout shell — all business logic lives in `PersonViewModel`.
 
 ```
-NavigationStack
-└── ContentView
-    ├── urlBar          (HStack with styled background, TextField, fetch button)
-    ├── Divider
-    ├── errorBanner?    (red HStack, dismiss button)
-    └── mainContent     (ScrollView > PersonEditorView  | ProgressView  | emptyState)
-        .toolbar { Export Menu (⌘E / ⌘⇧E) }
-        .navigationTitle(vm.person.wikiTitle | "Wikipedia to GEDCOM")
-        .focusedValue(\.personViewModel, vm)
+ContentView (VStack)
+├── urlBar  (ChipFlowLayout — wrapping chip row of URL chips + add button)
+├── Divider
+└── NavigationSplitView
+    ├── sidebar (sidebarContent)
+    │   ├── FetchOptionsView card
+    │   ├── Divider
+    │   ├── errorBanner? (red, dismissible)
+    │   ├── Segmented picker: People | Sources
+    │   ├── Divider
+    │   └── peopleList (List vm.persons, selection vm.selectedPersonID)
+    │       or sourcesList (List vm.sources, selection selectedSourceID)
+    │
+    └── detail (detailContent)
+        People tab:   PersonEditorView(person: vm.selectedPersonBinding())
+                      or emptyPeopleState
+        Sources tab:  SourceDetailView(source:)
+                      or emptySourceState
 ```
 
-The URL bar uses `NSColor.textBackgroundColor` fill and `NSColor.separatorColor` stroke to match native macOS text field appearance while incorporating the globe icon and fetch button into a single pill-shaped row.
+The **URL chip bar** uses `ChipFlowLayout` — a custom `Layout` that places chips left-to-right, wrapping to new rows when the available width is exceeded. The last item is always the "+" add button. Each `URLChip` shows the domain name of the URL and has an × button to remove it.
+
+The **toolbar** provides:
+- Leading: Settings button (gear / wand icon) → `LLMSettingsView` popover
+- Centre: Fetch button (or progress spinner + status text while loading) — `⌘↩`
+- Trailing: Export menu
+
+**Export menu items:**
+- Export as GEDCOM… → `vm.saveAsGED()`
+- Export as ZIP… → `vm.saveAsZip()`
+- Open in MacFamilyTree 11 → `vm.openInMacFamilyTree()`
+- View GEDCOM… → `vm.previewGEDCOM()`
+
+Disabled when `!vm.hasData`.
+
+Two `.sheet` modifiers are attached to the root view: one for `GEDCOMPreviewSheet` and one for `AIProgressSheet`.
 
 ### 6.5 Export Paths
 
 #### Export as GEDCOM (.ged)
 
 ```
-person.toPersonData()
-    → GEDCOMBuilder.build(persons: [personData], verbose: false)
+persons.filter(!isStub).map(toPersonData())
+    → GEDCOMBuilder.build(persons:, verbose: false)
     → String.write(to: url, atomically: true, encoding: .utf8)
+    → opens GEDCOMPreviewSheet
 ```
 
 The plain GEDCOM preserves remote URLs in all `FILE` tags; no images are downloaded.
@@ -891,13 +1093,24 @@ The plain GEDCOM preserves remote URLs in all `FILE` tags; no images are downloa
 #### Export as ZIP
 
 ```
-person.toPersonData()                   ← base PersonData with URL references
-fetch each image URL → (Data, mimeType)
-build relative media paths              "media/<safe>.<ext>"
-personData.imageFilePath = relPath      ← overrides imageURL for FILE tag
-GEDCOMBuilder.build(persons: [personData])   ← FILE tags now use relative paths
-GEDZIPBuilder.create(gedcom:mediaFiles:at:)  ← packs gedcom.ged + media/*
+for each non-stub person:
+    fetch primaryImage            → "media/<title>.jpg/png/…"
+    fetch each additionalMedia    → "media/<title>_N.jpg/…"
+personData.imageFilePath = relPath    ← overrides imageURL for FILE tag
+GEDCOMBuilder.build(persons: personDatas)   ← FILE tags use relative paths
+GEDZIPBuilder.create(gedcom:mediaFiles:at:) ← packs gedcom.ged + media/*
 ```
+
+### 6.6 LLMSettingsView
+
+**File:** `Sources/WikipediaScraperApp/LLMSettingsView.swift`
+
+A `Form { … }.formStyle(.grouped)` view presented in a popover from the toolbar settings button. Contains a single section ("Claude AI (Anthropic)") with:
+- `Toggle("Enable AI Analysis")` bound to `LLMSettings.shared.isEnabled`
+- `SecureField("sk-ant-…")` for the API key (shown only when enabled)
+- A footer warning when the key is empty
+
+Takes no init parameters — reads and writes `LLMSettings.shared` directly.
 
 ---
 
@@ -1014,18 +1227,19 @@ The ZIP must be round-tripped through a temp file because `GEDZIPBuilder` writes
 
 **File:** `Sources/WikipediaScraperIPad/iPadContentView.swift`
 
-Structurally identical to the macOS `ContentView` but adapted for touch:
+Structurally parallel to the macOS `ContentView` but adapted for touch:
 
 | macOS ContentView | iPadContentView |
 |-------------------|-----------------|
-| `NSColor.textBackgroundColor` URL bar background | Plain `HStack` with `roundedBorder` text field |
-| `ProgressView().controlSize(.small)` | `ProgressView().controlSize(.regular)` |
-| `TextField` with no keyboard attributes | `TextField` + `.keyboardType(.URL)` + `.textInputAutocapitalization(.never)` + `.autocorrectionDisabled()` |
-| `.keyboardShortcut(.return, modifiers: .command)` on fetch button | No keyboard shortcut (no hardware keyboard assumed) |
+| Wrapping `ChipFlowLayout` URL chip bar | `URLListBar` (horizontal scrolling chip strip) |
+| `FetchOptionsView` as a sidebar card | `FetchOptionsView` inline above the main content (chip strip mode) |
+| `NavigationSplitView` with sidebar + detail | `NavigationStack` with `PersonEditorView` pushed |
 | `NSSavePanel` triggered from ViewModel | `.fileExporter` modifiers on the view |
-| Empty state: "press Return or ⌘↩" | Empty state: "tap Return" |
+| Settings in toolbar popover (`LLMSettingsView`) | Settings as a `.sheet` |
+| Empty state: "⌘↩ to fetch" | Empty state: "tap Fetch" |
+| `ProgressView().controlSize(.small)` | `ProgressView().controlSize(.regular)` |
 
-The two `.fileExporter` modifiers are applied directly to the root `VStack`:
+The two `.fileExporter` modifiers are applied to the root `VStack`:
 
 ```swift
 .fileExporter(

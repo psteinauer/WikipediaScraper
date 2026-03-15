@@ -4,7 +4,7 @@ A Swift toolkit that converts Wikipedia biography articles into standards-compli
 
 | Tool | What it is |
 |------|-----------|
-| **Wikipedia to GEDCOM** (macOS app) | Point-and-click GUI — paste a Wikipedia URL, review and edit all parsed data, then export |
+| **Wikipedia to GEDCOM** (macOS app) | Point-and-click GUI — paste Wikipedia URLs, review and edit all parsed data, then export |
 | **Wikipedia to GEDCOM** (iPadOS app) | Same editor experience on iPad — touch-friendly URL bar, exports via iOS document picker |
 | **WikipediaScraper** (CLI tool) | Scriptable command-line tool — batch processing, automation, advanced options |
 
@@ -25,31 +25,48 @@ Double-click the app in Finder or Launchpad to open it. On first launch macOS ma
 
 ### How to use it
 
-1. **Paste a Wikipedia URL** into the address bar at the top and press Return (or ⌘↩).
-2. The app fetches the article, parses the infobox, and populates all fields.
-3. **Review and edit** every parsed field — names, dates, places, facts, positions, family, media.
-4. **Export** using the toolbar button or the File menu:
+1. **Paste Wikipedia URLs** into the address bar at the top. Each URL becomes a chip; add as many people as you like, then press ⌘↩ (or click the fetch button) to load them all at once.
+2. The app fetches each article, parses the infobox, and populates all fields. Fetched people appear in the **People** list in the sidebar.
+3. **Set fetch options** in the sidebar panel before (or after) fetching:
+   - **AI Analysis** — enriches data with Claude AI (requires an Anthropic API key).
+   - **Notes** — appends Wikipedia article sections as GEDCOM NOTE records.
+   - **All Images** — downloads every article image into the ZIP export.
+   - **Main Person Only** — exports only the explicitly-fetched people; no family stubs.
+4. **Select a person** from the sidebar to review and edit their data in the detail panel.
+5. **Export** using the toolbar Export button or the File menu:
    - **Export as GEDCOM… (⌘E)** — saves a plain `.ged` text file.
-   - **Export as ZIP… (⌘⇧E)** — saves a GEDZIP archive (`.zip`) containing `gedcom.ged` plus all portrait and media images embedded.
+   - **Export as ZIP… (⌘⇧E)** — saves a GEDZIP archive containing `gedcom.ged` plus all portrait and media images.
+   - **Open in MacFamilyTree 11** — exports a ZIP and opens it directly in MacFamilyTree.
+   - **View GEDCOM…** — previews the raw GEDCOM text in a scrollable sheet with copy and save options.
 
-### What you can edit
+### Settings
 
-| Section | Fields |
-|---------|--------|
-| Identity | Given name, surname, birth name, sex |
-| Media | Primary image URL (live preview), additional media URLs and captions |
-| Life events | Date, place, note for birth / death / burial / baptism; cause for death |
-| Titled positions | Title, from/to dates, place, predecessor, successor, note |
-| Custom events | Event type (editable), date, place, note |
-| Facts | Fact type (editable), value |
-| Honorifics | Free-text title strings |
-| Spouses | Name, marriage date/place, divorce date |
-| Children | Name list |
-| Parents | Father, mother |
-| Occupations | Free-text list |
-| Other | Nationality, religion |
+Click the **gear icon** (or wand icon when AI Analysis is enabled) in the toolbar to open the settings popover. This is where you configure the **Claude AI API key**. The fetch options (Notes, All Images, Main Person Only) are always visible in the sidebar.
 
-The **Media** section shows a live thumbnail for every image URL. Use **Add Media** to embed additional Wikimedia images in the exported ZIP.
+### Person detail view
+
+The detail panel shows the selected person's data organised into eight collapsible sections:
+
+| Section | Contents |
+|---------|----------|
+| **Name and Gender** | Wikipedia title (read-only), given name, surname, sex. The person's primary image appears to the right of this card when available. |
+| **Events** | Birth, Death, Burial, Baptism (date/place/note/cause); Spouses (name, marriage date/place, divorce date); Titled Positions; Custom Events |
+| **Facts** | Honorifics; Custom facts (type + value); Occupations; Attributes |
+| **Additional Names** | Birth name, alternate names, AI-generated alternate names and titles |
+| **Media** | Primary image URL with live preview; additional media items with captions |
+| **Notes** | Wikipedia article sections (populated when Notes is enabled) |
+| **Sources** | Wikipedia article citation; AI Analysis citation |
+| **Other** | Parents (father, mother); Children |
+
+**Expand and collapse shortcuts:**
+
+| Click | Effect |
+|-------|--------|
+| Plain click on section header | Toggle that section only |
+| ⌥ click on section header | Toggle the section and all its sub-sections |
+| ⌘⌥ click on section header | Toggle all other top-level sections (sub-section states unchanged) |
+
+All sections except **Name and Gender** start collapsed by default.
 
 ---
 
@@ -74,12 +91,15 @@ make ipad-sim    # builds for iPad Pro 13-inch (M5) simulator
 
 ### How to use it
 
-1. **Paste a Wikipedia URL** into the address bar at the top and tap Return.
-2. The app fetches the article, parses the infobox, and populates all fields.
-3. **Review and edit** every field — identical editing capabilities to the macOS app.
-4. **Export** using the toolbar button (top-right):
+1. **Paste Wikipedia URLs** into the address bar at the top and tap Return (or the fetch button).
+2. The app fetches each article and populates the People list.
+3. **Set fetch options** in the strip below the URL bar: AI Analysis, Notes, All Images, Main Person Only.
+4. **Select a person** from the sidebar to review and edit their data.
+5. **Export** using the toolbar button (top-right):
    - **Export as GEDCOM…** — opens the iOS document picker to save a `.ged` file.
    - **Export as ZIP…** — downloads all media, then opens the document picker to save a `.zip` GEDZIP archive.
+
+Tap the **gear icon** in the toolbar to configure the Claude AI API key.
 
 The iPadOS app supports all four orientations and multi-window (Stage Manager) on supported hardware.
 
@@ -195,11 +215,14 @@ An internet connection is required to fetch Wikipedia articles and images.
 
 - Parses Wikipedia infoboxes (`royalty`, `officeholder`, `biography`, `military person` templates) into structured genealogy data
 - Outputs GEDCOM 7.0 with full compliance: correct xrefs, UTF-8, CONT line-splitting, proper tag hierarchy
-- Accepts **multiple Wikipedia URLs** in a single run — all persons land in one GEDCOM file (CLI)
+- Accepts **multiple Wikipedia URLs** — all persons land in one GEDCOM file; the macOS and iPadOS apps show each person in a sidebar list
 - Automatically fetches Wikipedia data for **referenced people** (spouses, parents, children) one level deep
 - Persons referenced by multiple input URLs are **deduplicated** — one INDI record, one FAM record, shared across all contexts
 - Downloads portrait images from Wikimedia and packages them into a **GEDZIP archive**
-- Optionally downloads **every article image** into the archive (`--allimages` / ZIP export)
+- Optionally downloads **every article image** into the archive (`--allimages` / All Images option)
+- **AI Analysis** via Claude API (Anthropic) — enriches each article with alternate names, titles, facts, events, and influential people; results stored separately in the GEDCOM and cited as "Claude AI (Anthropic)"
+- **MacFamilyTree 11 integration** (macOS app) — one-click export and open
+- **GEDCOM preview** (macOS app) — scrollable, selectable, monospace view of the raw GEDCOM output with copy and save options
 - Emits titled positions (reign, office) as **GEDCOM EVEN with TYPE "Nobility title"**
 - Predecessor/successor links use **ASSO + RELA** (Influential Persons)
 - Source citations use **SOUR.WWW** (top-level domain) + **PAGE** (specific article URL) + **DATA.TEXT** (article extract)
@@ -261,7 +284,7 @@ archive.zip (or .gdz)
 ├── gedcom.ged              GEDCOM 7.0 file (FILE tags use relative paths)
 └── media/
     ├── Person_Name.jpg     Portrait downloaded from Wikimedia
-    └── Image_Caption.jpg   Additional images (--allimages / ZIP export)
+    └── Image_Caption.jpg   Additional images (--allimages / All Images option)
 ```
 
 ---
@@ -275,7 +298,7 @@ archive.zip (or .gdz)
 | Primary `NAME` | Wikipedia article title | `GIVN` + `SURN` subrecords; `NPFX` for honorific prefix |
 | Additional `NAME` | Infobox structured name | Added when it differs from the article title |
 | `NAME TYPE birth` | `birth_name` | Birth / maiden name |
-| `NAME TYPE aka` | Alternate names | From infobox |
+| `NAME TYPE aka` | Alternate names | From infobox and AI Analysis |
 
 ### INDI record tags
 
@@ -290,7 +313,7 @@ archive.zip (or .gdz)
 | `OCCU` | One tag per occupation |
 | `NATI` / `RELI` | Nationality, religion |
 | `ASSO RELA Predecessor/Successor` | Predecessor/successor links |
-| `NOTE` | Wikipedia article sections (`--notes`) |
+| `NOTE` | Wikipedia article sections (`--notes` / Notes option) |
 | `FAMS` / `FAMC` | Family links |
 | `SOUR` | Wikipedia article with `PAGE` + `DATA.TEXT` |
 | `OBJE` | Portrait + additional images |
@@ -312,7 +335,7 @@ archive.zip (or .gdz)
 
 By default the tool extracts Wikipedia article links from family fields (spouses, children, father, mother) and automatically fetches each referenced person, including them as full INDI records — one level deep, without recursion.
 
-Use `--nopeople` (CLI) to include only the explicitly-specified URLs. Referenced people not on the list become minimal stub records. Two command-line people who are married to each other still share a FAM record.
+Use `--nopeople` (CLI) or the **Main Person Only** option (apps) to include only the explicitly-specified URLs. Referenced people not on the list become minimal stub records. Two explicitly-fetched people who are married to each other still share a FAM record.
 
 ---
 
@@ -351,15 +374,24 @@ Sources/
 │
 ├── WikipediaScraperSharedUI/      Shared SwiftUI library (macOS + iPadOS)
 │   ├── EditableTypes.swift        Editable model types — EditablePerson, EditableEvent, …
-│   └── PersonEditorView.swift     PersonEditorView, EventSectionContent, MediaThumbnail
+│   ├── PersonEditorView.swift     PersonEditorView, EditorSection, SubGroup, FieldRow,
+│   │                              EventSectionContent, MediaThumbnail
+│   ├── FetchOptionsView.swift     Fetch options card (macOS sidebar) / chip strip (iPad)
+│   ├── LLMSettings.swift          Persistent Claude AI settings (API key, enabled flag)
+│   ├── AIProgressSheet.swift      AI analysis progress modal sheet
+│   ├── GEDCOMPreviewSheet.swift   GEDCOM preview modal (monospace, copy, save)
+│   ├── SourceInfo.swift           SourceInfo type — name, icon, URL for sources list
+│   ├── SourceDetailView.swift     Source detail panel
+│   └── URLListBar.swift           Shared URL chip utilities
 │
 ├── WikipediaScraper/              Command-line tool target
 │   └── WikipediaScraperCommand.swift  Entry point, argument parsing, orchestration
 │
 ├── WikipediaScraperApp/           macOS SwiftUI app target
 │   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
-│   ├── ContentView.swift          URL bar, toolbar, window layout
-│   ├── PersonViewModel.swift      ObservableObject ViewModel — fetch + NSSavePanel export
+│   ├── ContentView.swift          URL chip bar, sidebar, detail panel, toolbar
+│   ├── PersonViewModel.swift      ObservableObject ViewModel — fetch, export, AI, preview
+│   ├── LLMSettingsView.swift      Settings popover — Claude AI API key
 │   ├── Info.plist                 macOS bundle metadata
 │   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
 │
@@ -391,8 +423,8 @@ WikipediaScraperIPad.xcodeproj/    Xcode project for the iPadOS app (iOS Applica
 - Infobox parsing covers the most common templates; unusual or highly customised infoboxes may produce incomplete data — use `--mappings` to diagnose
 - Date parsing handles the most common Wikipedia date formats; highly non-standard formats fall back to an empty date
 - Referenced-person expansion is one level deep; it does not recursively follow the family trees of fetched persons
-- `--allimages` skips small images (< 100×100 px), icons, flags, logos, and other decorative images based on filename heuristics
-- The macOS and iPadOS apps process one person at a time; use the CLI for multi-person batch exports
+- `--allimages` / All Images skips small images (< 100×100 px), icons, flags, logos, and other decorative images based on filename heuristics
+- AI Analysis requires a valid Anthropic API key; usage is billed to your Anthropic account
 
 ---
 
