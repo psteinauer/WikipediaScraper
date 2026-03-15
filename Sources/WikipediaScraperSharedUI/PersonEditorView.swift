@@ -119,44 +119,56 @@ private final class ImageCache {
 
 public struct MediaThumbnail: View {
     public let urlString: String
-    public var width: CGFloat       = 72
-    /// Pass nil to fill the available height (e.g. to match a sibling card).
-    public var height: CGFloat?     = 90
+    /// Fixed width. Pass nil to let the width be derived from the image's
+    /// aspect ratio at the given height (requires height to be non-nil).
+    public var width: CGFloat?
+    public var height: CGFloat?
 
     private enum Phase { case idle, loading, success(Image), failure }
     @State private var phase: Phase = .idle
 
-    public init(urlString: String, width: CGFloat = 72, height: CGFloat? = 90) {
+    public init(urlString: String, width: CGFloat? = 72, height: CGFloat? = 90) {
         self.urlString = urlString
         self.width  = width
         self.height = height
     }
 
     public var body: some View {
-        Group {
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fill)
-            case .failure:
-                placeholderIcon("photo.badge.exclamationmark")
-            case .loading, .idle:
-                ProgressView().controlSize(.small)
+        framedContent
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(separatorColor, lineWidth: 0.5)
             }
+            // Re-runs whenever urlString changes or the view first appears.
+            // SwiftUI cancels the prior task automatically when the id changes.
+            .task(id: urlString) { await load() }
+    }
+
+    /// Applies the appropriate frame depending on whether a fixed width is given.
+    /// When width is nil the image uses .fit so the natural aspect ratio determines
+    /// the displayed width at the specified height.
+    @ViewBuilder
+    private var framedContent: some View {
+        if let w = width {
+            imageContent(fill: true)
+                .frame(width: w, height: height)
+        } else {
+            imageContent(fill: false)
+                .frame(height: height)
         }
-        // When height is nil use the flexible overload so the view expands
-        // to fill whatever height the parent proposes (e.g. an HStack peer).
-        .frame(
-            minWidth: width, maxWidth: width,
-            minHeight: height, idealHeight: height, maxHeight: height ?? .infinity
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(separatorColor, lineWidth: 0.5)
+    }
+
+    @ViewBuilder
+    private func imageContent(fill: Bool) -> some View {
+        switch phase {
+        case .success(let image):
+            image.resizable().aspectRatio(contentMode: fill ? .fill : .fit)
+        case .failure:
+            placeholderIcon("photo.badge.exclamationmark")
+        case .loading, .idle:
+            ProgressView().controlSize(.small)
         }
-        // Re-runs whenever urlString changes or the view first appears.
-        // SwiftUI cancels the prior task automatically when the id changes.
-        .task(id: urlString) { await load() }
     }
 
     @MainActor
@@ -539,8 +551,17 @@ private struct MediaGrid: View {
 
 // MARK: - PersonEditorView
 
+private struct NameCardHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 public struct PersonEditorView: View {
     @Binding public var person: EditablePerson
+
+    @State private var nameCardHeight: CGFloat = 0
 
     private static let topLevelSections = [
         "Name and Gender", "Events", "Facts", "Additional Names",
@@ -592,10 +613,19 @@ public struct PersonEditorView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     nameAndGenderSection
+                        .background {
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: NameCardHeightKey.self,
+                                    value: geo.size.height
+                                )
+                            }
+                        }
                     if !person.imageURL.isEmpty {
-                        MediaThumbnail(urlString: person.imageURL, width: 84, height: nil)
+                        MediaThumbnail(urlString: person.imageURL, width: nil, height: nameCardHeight)
                     }
                 }
+                .onPreferenceChange(NameCardHeightKey.self) { nameCardHeight = $0 }
                 eventsSection
                 factsSection
                 additionalNamesSection
