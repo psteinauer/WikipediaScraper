@@ -52,6 +52,7 @@ final class iPadPersonViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var statusMessage: String? = nil
+    @Published var mediaWarnings: [String] = []
 
     // Export state
     @Published var gedDocument  = GEDCOMDocument()
@@ -269,14 +270,31 @@ final class iPadPersonViewModel: ObservableObject {
                     pageTitle:    pageTitle,
                     excludingURL: primaryURL,
                     verbose:      false)
-                editable.additionalMedia = infos.map { info in
-                    var item = EditableMediaItem()
-                    item.url     = info.url
-                    item.caption = info.title
-                        .replacingOccurrences(of: "File:", with: "")
-                        .replacingOccurrences(of: "_", with: " ")
-                    return item
+
+                statusMessage = multi ? "Validating images (\(index + 1)/\(total))…" : "Validating images…"
+                var validMedia: [EditableMediaItem] = []
+                var failedTitles: [String] = []
+                await withTaskGroup(of: (EditableMediaItem, String, Bool).self) { group in
+                    for info in infos {
+                        group.addTask {
+                            var item = EditableMediaItem()
+                            item.url     = info.url
+                            item.caption = info.title
+                                .replacingOccurrences(of: "File:", with: "")
+                                .replacingOccurrences(of: "_", with: " ")
+                            let ok = await WikipediaClient.isImageReachable(info.url)
+                            return (item, info.title, ok)
+                        }
+                    }
+                    for await (item, title, ok) in group {
+                        if ok { validMedia.append(item) } else { failedTitles.append(title) }
+                    }
                 }
+                let order = infos.map(\.url)
+                editable.additionalMedia = validMedia.sorted {
+                    (order.firstIndex(of: $0.url) ?? 0) < (order.firstIndex(of: $1.url) ?? 0)
+                }
+                if !failedTitles.isEmpty { mediaWarnings += failedTitles }
             } catch { /* non-fatal */ }
         }
 
@@ -363,7 +381,7 @@ final class iPadPersonViewModel: ObservableObject {
                     personDatas[i].imageFilePath = relPath
                     mediaFiles.append((path: relPath, data: data))
                 } catch {
-                    statusMessage = "Warning: could not fetch image for \(person.wikiTitle)"
+                    mediaWarnings.append("Could not fetch image for \(person.wikiTitle)")
                 }
             }
 

@@ -244,13 +244,32 @@ public struct WikipediaClient {
         return results
     }
 
-    /// Download image data from a URL
+    /// Download image data from a URL. Throws if the server returns a non-2xx status.
     public static func fetchImageData(from urlString: String, verbose: Bool) async throws -> (Data, String) {
         guard let url = URL(string: urlString) else { throw ScraperError.invalidURL(urlString) }
         if verbose { fputs("  [fetch] image \(urlString)\n", stderr) }
         let (data, resp) = try await URLSession.shared.data(from: url)
+        try checkHTTP(resp, url: urlString)
         let mimeType = (resp as? HTTPURLResponse)?.mimeType ?? "image/jpeg"
         return (data, mimeType)
+    }
+
+    /// Check reachability of an image URL via HEAD request.
+    /// Returns `true` if the server responds with a 2xx status, `false` otherwise.
+    public static func isImageReachable(_ urlString: String) async -> Bool {
+        guard let url = URL(string: urlString) else { return false }
+        do {
+            var req = URLRequest(url: url)
+            req.httpMethod = "HEAD"
+            req.timeoutInterval = 15
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            if let http = resp as? HTTPURLResponse {
+                return (200..<300).contains(http.statusCode)
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Private

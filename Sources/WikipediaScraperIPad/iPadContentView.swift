@@ -75,6 +75,14 @@ struct iPadContentView: View {
         }
         .toolbar { globalToolbar }
         .sheet(isPresented: $showingSettings) { iPadLLMSettingsView() }
+        .alert("Some Images Could Not Be Loaded", isPresented: Binding(
+            get: { !vm.mediaWarnings.isEmpty },
+            set: { if !$0 { vm.mediaWarnings = [] } }
+        )) {
+            Button("OK") { vm.mediaWarnings = [] }
+        } message: {
+            Text(vm.mediaWarnings.joined(separator: "\n"))
+        }
         .fileExporter(
             isPresented:     $vm.isExportingGED,
             document:         vm.gedDocument,

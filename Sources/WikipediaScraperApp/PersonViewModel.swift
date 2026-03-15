@@ -15,6 +15,7 @@ final class PersonViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var statusMessage: String? = nil
+    @Published var mediaWarnings: [String] = []
 
     // Per-session fetch options — persisted across launches
     @Published var useNotes: Bool = false {
@@ -230,13 +231,34 @@ final class PersonViewModel: ObservableObject {
                     pageTitle:    pageTitle,
                     excludingURL: primaryURL,
                     verbose:      false)
-                editable.additionalMedia = infos.map { info in
-                    var item = EditableMediaItem()
-                    item.url     = info.url
-                    item.caption = info.title
-                        .replacingOccurrences(of: "File:", with: "")
-                        .replacingOccurrences(of: "_", with: " ")
-                    return item
+
+                // Validate all URLs concurrently — skip any that are unreachable.
+                statusMessage = multi ? "Validating images (\(index + 1)/\(total))…" : "Validating images…"
+                var validMedia: [EditableMediaItem] = []
+                var failedTitles: [String] = []
+                await withTaskGroup(of: (EditableMediaItem, String, Bool).self) { group in
+                    for info in infos {
+                        group.addTask {
+                            var item = EditableMediaItem()
+                            item.url     = info.url
+                            item.caption = info.title
+                                .replacingOccurrences(of: "File:", with: "")
+                                .replacingOccurrences(of: "_", with: " ")
+                            let ok = await WikipediaClient.isImageReachable(info.url)
+                            return (item, info.title, ok)
+                        }
+                    }
+                    for await (item, title, ok) in group {
+                        if ok { validMedia.append(item) } else { failedTitles.append(title) }
+                    }
+                }
+                // Restore display order (task group results arrive out of order)
+                let order = infos.map(\.url)
+                editable.additionalMedia = validMedia.sorted {
+                    (order.firstIndex(of: $0.url) ?? 0) < (order.firstIndex(of: $1.url) ?? 0)
+                }
+                if !failedTitles.isEmpty {
+                    mediaWarnings += failedTitles
                 }
             } catch { /* non-fatal */ }
         }
@@ -357,8 +379,8 @@ final class PersonViewModel: ObservableObject {
         var mediaFiles: [(path: String, data: Data)] = []
         var personDatas = full.map { $0.toPersonData() }
         if noPeople { personDatas = personDatas.map { var p = $0; stripFamilyRefs(&p); return p } }
+        var zipWarnings: [String] = []
 
-        // Download all media for all persons
         for (i, person) in full.enumerated() {
             let prefix = safeBasename(person.wikiTitle, fallback: "person_\(i)")
 
@@ -371,7 +393,7 @@ final class PersonViewModel: ObservableObject {
                     personDatas[i].imageFilePath = relPath
                     mediaFiles.append((path: relPath, data: data))
                 } catch {
-                    statusMessage = "Warning: could not fetch image for \(person.wikiTitle)"
+                    zipWarnings.append("Portrait of \(person.wikiTitle): \(error.localizedDescription)")
                 }
             }
 
@@ -384,8 +406,15 @@ final class PersonViewModel: ObservableObject {
                     let relPath = "media/\(prefix)_\(j + 1).\(mimeExt(mime))"
                     personDatas[i].additionalMedia[j].filePath = relPath
                     mediaFiles.append((path: relPath, data: data))
-                } catch { /* non-fatal: skip missing additional media */ }
+                } catch {
+                    let name = item.caption.isEmpty ? item.url : item.caption
+                    zipWarnings.append("\(name): \(error.localizedDescription)")
+                }
             }
+        }
+
+        if !zipWarnings.isEmpty {
+            mediaWarnings += zipWarnings
         }
 
         var builder = GEDCOMBuilder()
