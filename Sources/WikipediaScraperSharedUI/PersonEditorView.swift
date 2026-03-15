@@ -119,15 +119,16 @@ private final class ImageCache {
 
 public struct MediaThumbnail: View {
     public let urlString: String
-    public var width: CGFloat  = 72
-    public var height: CGFloat = 90
+    public var width: CGFloat       = 72
+    /// Pass nil to fill the available height (e.g. to match a sibling card).
+    public var height: CGFloat?     = 90
 
     private enum Phase { case idle, loading, success(Image), failure }
     @State private var phase: Phase = .idle
 
-    public init(urlString: String, width: CGFloat = 72, height: CGFloat = 90) {
+    public init(urlString: String, width: CGFloat = 72, height: CGFloat? = 90) {
         self.urlString = urlString
-        self.width = width
+        self.width  = width
         self.height = height
     }
 
@@ -142,7 +143,12 @@ public struct MediaThumbnail: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .frame(width: width, height: height)
+        // When height is nil use the flexible overload so the view expands
+        // to fill whatever height the parent proposes (e.g. an HStack peer).
+        .frame(
+            minWidth: width, maxWidth: width,
+            minHeight: height, idealHeight: height, maxHeight: height ?? .infinity
+        )
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -587,7 +593,7 @@ public struct PersonEditorView: View {
                 HStack(alignment: .top, spacing: 12) {
                     nameAndGenderSection
                     if !person.imageURL.isEmpty {
-                        MediaThumbnail(urlString: person.imageURL, width: 84, height: 106)
+                        MediaThumbnail(urlString: person.imageURL, width: 84, height: nil)
                     }
                 }
                 eventsSection
