@@ -6,7 +6,7 @@ IPAD_SCHEME   = WikipediaScraperIPad
 IPAD_PROJECT  = WikipediaScraperIPad.xcodeproj
 INSTALL_PREFIX ?= /usr/local/bin
 
-.PHONY: build release install app app-release ipad ipad-sim icons clean xcode xcode-ipad test
+.PHONY: build release install app app-release ipad ipad-sim ipad-sim-reset icons clean xcode xcode-ipad test
 
 ## Build debug binaries
 build:
@@ -52,7 +52,7 @@ app: app-release
 app-release:
 	swift build -c release --product $(APP_BINARY)
 
-## Build and run the iPadOS app in the iPad simulator (requires Xcode)
+## Build, install, and launch the iPadOS app in the iPad simulator (requires Xcode)
 ipad-sim:
 	@echo "→ Building $(IPAD_SCHEME) for iPad simulator…"
 	xcrun xcodebuild \
@@ -67,6 +67,25 @@ ipad-sim:
 	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M5)" \
 	    -configuration Debug \
 	    build
+	@SIM_ID=$$(xcrun simctl list devices available | grep "iPad Pro 13-inch (M5)" | grep Booted | grep -Eo '[A-F0-9-]{36}' | head -1); \
+	 APP=$$(find ~/Library/Developer/Xcode/DerivedData -path "*/Debug-iphonesimulator/$(IPAD_BINARY).app" -maxdepth 6 | head -1); \
+	 if [ -n "$$SIM_ID" ] && [ -n "$$APP" ]; then \
+	   echo "→ Installing on simulator $$SIM_ID…"; \
+	   xcrun simctl install "$$SIM_ID" "$$APP"; \
+	   echo "→ Launching…"; \
+	   xcrun simctl launch "$$SIM_ID" com.psteinauer.WikipediaToGEDCOM.iPad; \
+	 else \
+	   echo "  (no booted iPad Pro 13-inch M5 found — boot a simulator and re-run, or use make xcode-ipad)"; \
+	 fi
+
+## Erase and reboot the iPad simulator (fixes stale-state crashes)
+ipad-sim-reset:
+	@SIM_ID=$$(xcrun simctl list devices available | grep "iPad Pro 13-inch (M5)" | grep -Eo '[A-F0-9-]{36}' | head -1); \
+	 echo "→ Resetting simulator $$SIM_ID…"; \
+	 xcrun simctl shutdown "$$SIM_ID" 2>/dev/null; sleep 2; \
+	 xcrun simctl erase "$$SIM_ID"; \
+	 xcrun simctl boot "$$SIM_ID"; \
+	 echo "✓  Simulator reset. Run 'make ipad-sim' to reinstall."
 
 ## Build the iPadOS app in release (archive — no install)
 ipad:
