@@ -97,6 +97,13 @@ struct ContentView: View {
         .sheet(isPresented: $showingAddURL) {
             AddURLSheet { url in vm.addURL(url) }
         }
+        .sheet(isPresented: $vm.showingAIProgress) {
+            AIProgressSheet(
+                entries:     $vm.aiProgressEntries,
+                isPresented: $vm.showingAIProgress,
+                isComplete:  vm.aiProgressEntries.allSatisfy { $0.isDone || $0.failed }
+            )
+        }
     }
 
     // MARK: - URL bar (full-width, wrapping chip row)

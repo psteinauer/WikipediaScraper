@@ -16,10 +16,11 @@ import Foundation
 // MARK: - Assoc types
 
 private struct AssocLink {
-    var indiID: String
-    var rela:   String   // e.g. "Predecessor", "Successor", "Mentor", "Rival"
-    var note:   String?  // context note
-    var sourID: String   // which SOUR record to cite
+    var indiID:      String
+    var rela:        String   // e.g. "Predecessor", "Successor", "Mentor", "Rival"
+    var note:        String?  // context note
+    var sourID:      String?  // Wikipedia SOUR xref; nil for AI-generated links
+    var aiGenerated: Bool = false
 }
 
 private struct AssocStub {
@@ -58,10 +59,7 @@ private struct BuildContext {
     var assocLinks: [AssocLink] = []
     var assocStubs: [AssocStub] = []
 
-    // Claude AI source ID (set when person has LLM enrichment data)
-    var llmSourID: String? = nil
-
-    init(from person: PersonData, sourID: String, llmSourID: String?,
+    init(from person: PersonData, sourID: String,
          personRegistry: inout [String: String],
          familyRegistry: inout [String: String],
          nextI: inout Int, nextF: inout Int, nextO: inout Int) {
@@ -71,7 +69,6 @@ private struct BuildContext {
                        ?? personRegistry[person.name ?? ""]
                        ?? { let id = "@I\(nextI)@"; nextI += 1; return id }()
         self.sourID    = sourID
-        self.llmSourID = llmSourID
 
         // Register a newly-allocated stub ID in the shared personRegistry so that
         // subsequent BuildContext instances deduplicate against it.
@@ -180,21 +177,19 @@ private struct BuildContext {
             }
         }
 
-        // LLM-identified influential people → ASSO (cited against Claude source)
-        let llmID = llmSourID ?? sourID
+        // LLM-identified influential people → ASSO (tagged AI Generated, no source citation)
         for ip in person.influentialPeople {
             guard !ip.name.isEmpty else { continue }
             let (indiID, known) = resolve(wikiTitle: ip.wikiTitle, name: ip.name)
             if !known {
                 assocStubs.append(AssocStub(indiID: indiID, name: ip.name))
             }
-            let note = [ip.note, "Identified by Claude AI analysis."]
-                .compactMap { $0 }.joined(separator: " ")
             assocLinks.append(AssocLink(
-                indiID: indiID,
-                rela:   ip.relationship,
-                note:   note.isEmpty ? nil : note,
-                sourID: llmID))
+                indiID:      indiID,
+                rela:        ip.relationship,
+                note:        ip.note,
+                sourID:      nil,
+                aiGenerated: true))
         }
 
         // Multimedia — portrait
@@ -229,14 +224,6 @@ public struct GEDCOMBuilder {
             if sourIDs[base] == nil { sourIDs[base] = "@S\(nextS)@"; nextS += 1 }
         }
 
-        // Allocate a Claude AI source record if any person has LLM enrichment
-        let hasLLM = persons.contains {
-            !$0.llmAlternateNames.isEmpty || !$0.llmTitles.isEmpty ||
-            !$0.llmFacts.isEmpty || !$0.llmEvents.isEmpty || !$0.influentialPeople.isEmpty
-        }
-        let llmSourID: String? = hasLLM ? "@S\(nextS)@" : nil
-        if hasLLM { nextS += 1 }
-
         // ── Pre-allocate main INDI IDs for all persons ─────────────────────────
         // Build personRegistry before constructing contexts so cross-references
         // between persons in the list resolve to the correct pre-allocated IDs.
@@ -257,13 +244,7 @@ public struct GEDCOMBuilder {
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             let sID  = sourIDs[base] ?? "@S1@"
-            // Only give a person the LLM source ID when that specific person has LLM data;
-            // persons fetched without --llm must not cite Claude AI as a source.
-            let personHasLLM = !person.llmAlternateNames.isEmpty || !person.llmTitles.isEmpty
-                || !person.llmFacts.isEmpty || !person.llmEvents.isEmpty
-                || !person.influentialPeople.isEmpty
             contexts.append(BuildContext(from: person, sourID: sID,
-                                          llmSourID: personHasLLM ? llmSourID : nil,
                                           personRegistry: &personRegistry,
                                           familyRegistry: &familyRegistry,
                                           nextI: &nextI, nextF: &nextF, nextO: &nextO))
@@ -285,9 +266,6 @@ public struct GEDCOMBuilder {
         for (base, sID) in sourIDs.sorted(by: { $0.value < $1.value }) {
             writeSource(baseURL: base, sourID: sID)
         }
-
-        // Claude AI source record (only when LLM enrichment was used)
-        if let llmID = llmSourID { writeLLMSource(sourID: llmID) }
 
         for (person, ctx) in zip(persons, contexts) {
             if let oid = ctx.objeID { writeMultimedia(person: person, objeID: oid, sourID: ctx.sourID) }
@@ -443,46 +421,32 @@ public struct GEDCOMBuilder {
             line(1, "ASSO \(asso.indiID)")
             line(2, "RELA \(asso.rela)")
             if let n = asso.note { line(2, "NOTE \(n)") }
-            line(2, "SOUR \(asso.sourID)")
+            if asso.aiGenerated  { line(2, "NOTE AI Generated") }
+            if let sID = asso.sourID { line(2, "SOUR \(sID)") }
         }
 
-        // ── LLM-sourced enrichment (cited against Claude AI source) ───────────
-        if let llmID = ctx.llmSourID {
-            let llmNote = "Extracted by Claude AI (Anthropic) from Wikipedia article text."
-
-            // Alternate names identified by LLM
-            for alt in person.llmAlternateNames {
-                line(1, "NAME \(alt)")
-                line(2, "TYPE aka")
-                line(2, "NOTE \(llmNote)")
-                line(2, "SOUR \(llmID)")
-            }
-
-            // Additional titles / honorifics identified by LLM
-            for title in person.llmTitles {
-                line(1, "TITL \(title)")
-                line(2, "NOTE \(llmNote)")
-                line(2, "SOUR \(llmID)")
-            }
-
-            // Additional facts identified by LLM
-            for fact in person.llmFacts {
-                line(1, "FACT \(fact.value)")
-                line(2, "TYPE \(fact.type)")
-                line(2, "NOTE \(llmNote)")
-                line(2, "SOUR \(llmID)")
-            }
-
-            // Additional events identified by LLM
-            for evt in person.llmEvents {
-                line(1, "EVEN")
-                line(2, "TYPE \(evt.type)")
-                if let d = evt.date, !d.isEmpty { line(2, "DATE \(d.gedcom)") }
-                if let p = evt.place            { line(2, "PLAC \(p)") }
-                let evtNote = [evt.note, llmNote].compactMap { $0 }.joined(separator: " ")
-                line(2, "NOTE \(evtNote)")
-                line(2, "SOUR \(llmID)")
-            }
+        // ── LLM-sourced enrichment (tagged NOTE AI Generated; no separate source record) ──
+        for alt in person.llmAlternateNames {
+            line(1, "NAME \(alt)")
+            line(2, "TYPE aka")
+            line(2, "NOTE AI Generated")
+        }
+        for title in person.llmTitles {
+            line(1, "TITL \(title)")
+            line(2, "NOTE AI Generated")
+        }
+        for fact in person.llmFacts {
+            line(1, "FACT \(fact.value)")
+            line(2, "TYPE \(fact.type)")
+            line(2, "NOTE AI Generated")
+        }
+        for evt in person.llmEvents {
+            line(1, "EVEN")
+            line(2, "TYPE \(evt.type)")
+            if let d = evt.date, !d.isEmpty { line(2, "DATE \(d.gedcom)") }
+            if let p = evt.place            { line(2, "PLAC \(p)") }
+            if let n = evt.note             { line(2, "NOTE \(n)") }
+            line(2, "NOTE AI Generated")
         }
 
         // Wikipedia article sections — one NOTE per section (--notes)
@@ -678,19 +642,6 @@ public struct GEDCOMBuilder {
         df.locale     = Locale(identifier: "en_US")
         df.dateFormat = "d MMM yyyy"
         line(1, "DATE \(df.string(from: Date()).uppercased())")
-    }
-
-    // MARK: SOUR — Claude AI (LLM enrichment)
-
-    private mutating func writeLLMSource(sourID: String) {
-        line(0, "\(sourID) SOUR")
-        line(1, "TITL Claude AI (Anthropic)")
-        line(1, "AUTH Anthropic, PBC")
-        line(1, "PUBL Anthropic, PBC")
-        line(1, "WWW https://anthropic.com")
-        line(1, "NOTE Data in records citing this source was extracted by Claude AI " +
-                "large language model analysis of Wikipedia article text and should " +
-                "be independently verified.")
     }
 
     // MARK: OBJE

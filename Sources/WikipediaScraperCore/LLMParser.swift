@@ -30,12 +30,13 @@ public struct LLMClient {
     ///   - model:     Claude model ID (default `claude-sonnet-4-6`).
     ///   - verbose:   Print progress to stderr.
     public static func analyze(
-        pageTitle: String,
-        wikitext:  String,
-        extract:   String?,
-        apiKey:    String,
-        model:     String = "claude-sonnet-4-6",
-        verbose:   Bool   = false
+        pageTitle:  String,
+        wikitext:   String,
+        extract:    String?,
+        apiKey:     String,
+        model:      String = "claude-sonnet-4-6",
+        verbose:    Bool   = false,
+        onProgress: (@MainActor (String) -> Void)? = nil
     ) async throws -> LLMAnalysis {
 
         if verbose { fputs("  [llm] Calling Claude (\(model)) for \(pageTitle)…\n", stderr) }
@@ -46,17 +47,24 @@ public struct LLMClient {
             extract:   extract,
             model:     model)
 
+        await MainActor.run { onProgress?("Sending request to AI model…") }
         let responseJSON = try await callAPI(requestBody: requestBody, apiKey: apiKey)
+        await MainActor.run { onProgress?("Parsing response…") }
 
         let analysis = parseResponse(responseJSON, verbose: verbose)
 
-        if verbose {
-            fputs("  [llm] Found: \(analysis.alternateNames.count) alt names, " +
-                  "\(analysis.additionalTitles.count) titles, " +
-                  "\(analysis.additionalFacts.count) facts, " +
-                  "\(analysis.additionalEvents.count) events, " +
-                  "\(analysis.influentialPeople.count) influential people\n", stderr)
-        }
+        // Build a human-readable result summary
+        let parts: [String] = [
+            analysis.alternateNames.isEmpty    ? nil : "\(analysis.alternateNames.count) alternate name\(analysis.alternateNames.count == 1 ? "" : "s")",
+            analysis.additionalTitles.isEmpty  ? nil : "\(analysis.additionalTitles.count) title\(analysis.additionalTitles.count == 1 ? "" : "s")",
+            analysis.additionalFacts.isEmpty   ? nil : "\(analysis.additionalFacts.count) fact\(analysis.additionalFacts.count == 1 ? "" : "s")",
+            analysis.additionalEvents.isEmpty  ? nil : "\(analysis.additionalEvents.count) event\(analysis.additionalEvents.count == 1 ? "" : "s")",
+            analysis.influentialPeople.isEmpty ? nil : "\(analysis.influentialPeople.count) influential person\(analysis.influentialPeople.count == 1 ? "" : "s")",
+        ].compactMap { $0 }
+        let resultMsg = parts.isEmpty ? "No additional data found" : "Found: " + parts.joined(separator: ", ")
+
+        if verbose { fputs("  [llm] \(resultMsg)\n", stderr) }
+        await MainActor.run { onProgress?(resultMsg) }
 
         return analysis
     }

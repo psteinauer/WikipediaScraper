@@ -75,6 +75,13 @@ struct iPadContentView: View {
         }
         .toolbar { globalToolbar }
         .sheet(isPresented: $showingSettings) { iPadLLMSettingsView() }
+        .sheet(isPresented: $vm.showingAIProgress) {
+            AIProgressSheet(
+                entries:     $vm.aiProgressEntries,
+                isPresented: $vm.showingAIProgress,
+                isComplete:  vm.aiProgressEntries.allSatisfy { $0.isDone || $0.failed }
+            )
+        }
         .alert("Some Images Could Not Be Loaded", isPresented: Binding(
             get: { !vm.mediaWarnings.isEmpty },
             set: { if !$0 { vm.mediaWarnings = [] } }

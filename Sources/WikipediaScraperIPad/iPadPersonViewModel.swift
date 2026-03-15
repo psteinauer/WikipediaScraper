@@ -53,6 +53,8 @@ final class iPadPersonViewModel: ObservableObject {
     @Published var errorMessage: String? = nil
     @Published var statusMessage: String? = nil
     @Published var mediaWarnings: [String] = []
+    @Published var aiProgressEntries: [AIProgressEntry] = []
+    @Published var showingAIProgress: Bool = false
 
     // Export state
     @Published var gedDocument  = GEDCOMDocument()
@@ -210,6 +212,7 @@ final class iPadPersonViewModel: ObservableObject {
 
         errorMessage = nil
         statusMessage = nil
+        aiProgressEntries = []
         isLoading = true
         defer { isLoading = false }
 
@@ -292,19 +295,32 @@ final class iPadPersonViewModel: ObservableObject {
                 errorMessage = "AI Analysis requires an Anthropic API key. Set it in Settings."
             } else {
                 statusMessage = multi ? "Running AI analysis (\(index + 1)/\(total))…" : "Running AI analysis…"
+
+                // Open progress sheet and register this article
+                let entryIdx = aiProgressEntries.count
+                aiProgressEntries.append(AIProgressEntry(title: pageTitle))
+                showingAIProgress = true
+
                 do {
                     let analysis = try await LLMClient.analyze(
-                        pageTitle: pageTitle,
-                        wikitext:  wikitext,
-                        extract:   summary.extract,
-                        apiKey:    key,
-                        verbose:   false)
+                        pageTitle:  pageTitle,
+                        wikitext:   wikitext,
+                        extract:    summary.extract,
+                        apiKey:     key,
+                        verbose:    false,
+                        onProgress: { [weak self] message in
+                            guard let self else { return }
+                            self.aiProgressEntries[entryIdx].steps.append(message)
+                        })
                     editable.llmAlternateNames = analysis.alternateNames
                     editable.llmTitles         = analysis.additionalTitles
                     editable.llmFacts          = analysis.additionalFacts
                     editable.llmEvents         = analysis.additionalEvents
                     editable.influentialPeople = analysis.influentialPeople
+                    aiProgressEntries[entryIdx].isDone = true
                 } catch {
+                    aiProgressEntries[entryIdx].steps.append("Error: \(error.localizedDescription)")
+                    aiProgressEntries[entryIdx].failed = true
                     errorMessage = "AI analysis failed: \(error.localizedDescription)"
                 }
             }
