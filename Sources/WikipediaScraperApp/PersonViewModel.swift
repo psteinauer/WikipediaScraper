@@ -18,6 +18,8 @@ final class PersonViewModel: ObservableObject {
     @Published var mediaWarnings: [String] = []
     @Published var aiProgressEntries: [AIProgressEntry] = []
     @Published var showingAIProgress: Bool = false
+    @Published var gedcomPreviewText: String? = nil
+    @Published var showingGEDCOMPreview: Bool = false
 
     // Per-session fetch options — persisted across launches
     @Published var useNotes: Bool = false {
@@ -318,11 +320,24 @@ final class PersonViewModel: ObservableObject {
                     let gedcom  = builder.build(persons: personDatas, verbose: false)
                     try gedcom.write(to: url, atomically: true, encoding: .utf8)
                     self.statusMessage = "Saved \(url.lastPathComponent)"
+                    // Show the generated GEDCOM in the viewer
+                    self.gedcomPreviewText   = gedcom
+                    self.showingGEDCOMPreview = true
                 } catch {
                     self.statusMessage = "Error saving: \(error.localizedDescription)"
                 }
             }
         }
+    }
+
+    // MARK: - Preview GEDCOM
+
+    func previewGEDCOM() {
+        var personDatas = persons.filter { !$0.isStub }.map { $0.toPersonData() }
+        if noPeople { personDatas = personDatas.map { var p = $0; stripFamilyRefs(&p); return p } }
+        var builder = GEDCOMBuilder()
+        gedcomPreviewText  = builder.build(persons: personDatas, verbose: false)
+        showingGEDCOMPreview = true
     }
 
     // MARK: - Export as ZIP
@@ -419,6 +434,8 @@ final class PersonViewModel: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    var gedcomFilename: String { exportFilename + ".ged" }
 
     private var exportFilename: String {
         if let first = persons.first(where: { !$0.isStub }), !first.wikiTitle.isEmpty {

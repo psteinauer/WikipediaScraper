@@ -97,6 +97,14 @@ struct ContentView: View {
         .sheet(isPresented: $showingAddURL) {
             AddURLSheet { url in vm.addURL(url) }
         }
+        .sheet(isPresented: $vm.showingGEDCOMPreview) {
+            if let gedcom = vm.gedcomPreviewText {
+                GEDCOMPreviewSheet(
+                    gedcom:   gedcom,
+                    filename: vm.gedcomFilename
+                )
+            }
+        }
         .sheet(isPresented: $vm.showingAIProgress) {
             AIProgressSheet(
                 entries:     $vm.aiProgressEntries,
@@ -224,6 +232,8 @@ struct ContentView: View {
             Button("Export as ZIP…")    { Task { await vm.saveAsZip() } }
             Divider()
             Button("Open in MacFamilyTree 11") { Task { await vm.openInMacFamilyTree() } }
+            Divider()
+            Button("View GEDCOM…") { vm.previewGEDCOM() }
         } label: {
             Label("Export", systemImage: "square.and.arrow.up")
         }

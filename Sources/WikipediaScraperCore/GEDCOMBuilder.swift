@@ -59,7 +59,10 @@ private struct BuildContext {
     var assocLinks: [AssocLink] = []
     var assocStubs: [AssocStub] = []
 
-    init(from person: PersonData, sourID: String,
+    // AI vendor source ID — set only when this person has LLM enrichment data
+    var llmSourID: String? = nil
+
+    init(from person: PersonData, sourID: String, llmSourID: String?,
          personRegistry: inout [String: String],
          familyRegistry: inout [String: String],
          nextI: inout Int, nextF: inout Int, nextO: inout Int) {
@@ -69,6 +72,7 @@ private struct BuildContext {
                        ?? personRegistry[person.name ?? ""]
                        ?? { let id = "@I\(nextI)@"; nextI += 1; return id }()
         self.sourID    = sourID
+        self.llmSourID = llmSourID
 
         // Register a newly-allocated stub ID in the shared personRegistry so that
         // subsequent BuildContext instances deduplicate against it.
@@ -177,7 +181,7 @@ private struct BuildContext {
             }
         }
 
-        // LLM-identified influential people → ASSO (tagged AI Generated, no source citation)
+        // LLM-identified influential people → ASSO (AI Generated; cited against AI vendor source)
         for ip in person.influentialPeople {
             guard !ip.name.isEmpty else { continue }
             let (indiID, known) = resolve(wikiTitle: ip.wikiTitle, name: ip.name)
@@ -188,7 +192,7 @@ private struct BuildContext {
                 indiID:      indiID,
                 rela:        ip.relationship,
                 note:        ip.note,
-                sourID:      nil,
+                sourID:      llmSourID,
                 aiGenerated: true))
         }
 
@@ -224,6 +228,14 @@ public struct GEDCOMBuilder {
             if sourIDs[base] == nil { sourIDs[base] = "@S\(nextS)@"; nextS += 1 }
         }
 
+        // Allocate one AI-vendor source record if any person has LLM enrichment
+        let hasLLM = persons.contains {
+            !$0.llmAlternateNames.isEmpty || !$0.llmTitles.isEmpty ||
+            !$0.llmFacts.isEmpty || !$0.llmEvents.isEmpty || !$0.influentialPeople.isEmpty
+        }
+        let llmSourID: String? = hasLLM ? "@S\(nextS)@" : nil
+        if hasLLM { nextS += 1 }
+
         // ── Pre-allocate main INDI IDs for all persons ─────────────────────────
         // Build personRegistry before constructing contexts so cross-references
         // between persons in the list resolve to the correct pre-allocated IDs.
@@ -244,7 +256,12 @@ public struct GEDCOMBuilder {
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             let sID  = sourIDs[base] ?? "@S1@"
+            // Only pass the AI source ID to persons that actually have LLM data
+            let personHasLLM = !person.llmAlternateNames.isEmpty || !person.llmTitles.isEmpty
+                || !person.llmFacts.isEmpty || !person.llmEvents.isEmpty
+                || !person.influentialPeople.isEmpty
             contexts.append(BuildContext(from: person, sourID: sID,
+                                          llmSourID: personHasLLM ? llmSourID : nil,
                                           personRegistry: &personRegistry,
                                           familyRegistry: &familyRegistry,
                                           nextI: &nextI, nextF: &nextF, nextO: &nextO))
@@ -266,6 +283,9 @@ public struct GEDCOMBuilder {
         for (base, sID) in sourIDs.sorted(by: { $0.value < $1.value }) {
             writeSource(baseURL: base, sourID: sID)
         }
+
+        // AI vendor source record (only when at least one person has LLM enrichment)
+        if let llmID = llmSourID { writeAIVendorSource(sourID: llmID) }
 
         for (person, ctx) in zip(persons, contexts) {
             if let oid = ctx.objeID { writeMultimedia(person: person, objeID: oid, sourID: ctx.sourID) }
@@ -479,6 +499,12 @@ public struct GEDCOMBuilder {
             line(3, "TEXT \(excerpt)")
         }
 
+        // Single AI-vendor source citation for the whole INDI record (only LLM-enriched persons)
+        if let llmID = ctx.llmSourID {
+            line(1, "SOUR \(llmID)")
+            line(2, "NOTE This record was enriched with additional genealogical data by AI analysis.")
+        }
+
         // Multimedia links — portrait + additional images
         if let oid = ctx.objeID { line(1, "OBJE \(oid)") }
         for oid in ctx.additionalObjeIDs { line(1, "OBJE \(oid)") }
@@ -642,6 +668,19 @@ public struct GEDCOMBuilder {
         df.locale     = Locale(identifier: "en_US")
         df.dateFormat = "d MMM yyyy"
         line(1, "DATE \(df.string(from: Date()).uppercased())")
+    }
+
+    // MARK: SOUR — AI vendor (LLM enrichment)
+
+    private mutating func writeAIVendorSource(sourID: String) {
+        line(0, "\(sourID) SOUR")
+        line(1, "TITL Claude AI (Anthropic)")
+        line(1, "AUTH Anthropic, PBC")
+        line(1, "PUBL Anthropic, PBC")
+        line(1, "WWW https://anthropic.com")
+        line(1, "NOTE Records citing this source were enriched by Claude AI large language " +
+                "model analysis of Wikipedia article text. AI-generated data items are " +
+                "individually tagged NOTE AI Generated and should be independently verified.")
     }
 
     // MARK: OBJE
