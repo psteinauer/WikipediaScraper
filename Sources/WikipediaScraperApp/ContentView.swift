@@ -2,6 +2,64 @@ import SwiftUI
 import AppKit
 import WikipediaScraperSharedUI
 
+// MARK: - Chip flow layout
+//
+// Lays out variable-width children left-to-right, wrapping to new rows as
+// needed.  The container height grows to fit all rows; the width fills the
+// available space (set by the parent).
+
+private struct ChipFlowLayout: Layout {
+    var hSpacing: CGFloat = 6
+    var vSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = layout(subviews: subviews, in: proposal.width ?? 0)
+        return result.totalSize
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(subviews: subviews, in: bounds.width)
+        for (subview, frame) in zip(subviews, result.frames) {
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(frame.size)
+            )
+        }
+    }
+
+    private struct LayoutResult {
+        var frames: [CGRect]
+        var totalSize: CGSize
+    }
+
+    private func layout(subviews: Subviews, in width: CGFloat) -> LayoutResult {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            // Wrap if this item would overflow (but never wrap the very first item on a row)
+            if x > 0 && x + size.width > width {
+                y         += rowHeight + vSpacing
+                x          = 0
+                rowHeight  = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x         += size.width + hSpacing
+            rowHeight  = max(rowHeight, size.height)
+        }
+
+        return LayoutResult(
+            frames:    frames,
+            totalSize: CGSize(width: width, height: y + rowHeight)
+        )
+    }
+}
+
+// MARK: - Content view
+
 struct ContentView: View {
     @StateObject private var vm = PersonViewModel()
     @State private var sidebarTab: SidebarTab = .people
@@ -15,12 +73,16 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            sidebarContent
-                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-        } detail: {
-            detailContent
-                .navigationTitle(detailTitle)
+        VStack(spacing: 0) {
+            urlBar
+            Divider()
+            NavigationSplitView {
+                sidebarContent
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            } detail: {
+                detailContent
+                    .navigationTitle(detailTitle)
+            }
         }
         .toolbar { toolbarContent }
         .focusedValue(\.personViewModel, vm)
@@ -37,11 +99,55 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - URL bar (full-width, wrapping chip row)
+
+    private var urlBar: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "globe")
+                .foregroundStyle(.tertiary)
+                .imageScale(.small)
+                // Optically align the icon with the first row of chips
+                .padding(.top, 5)
+
+            ChipFlowLayout(hSpacing: 6, vSpacing: 6) {
+                ForEach(vm.urls, id: \.self) { url in
+                    URLChip(urlString: url) { vm.removeURL(url) }
+                }
+                // The + button is the last item in the flow so it is always
+                // reachable — it wraps onto a new line when the row is full.
+                addButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    private var addButton: some View {
+        Button {
+            showingAddURL = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .imageScale(.small)
+                    .fontWeight(.semibold)
+                if vm.urls.isEmpty {
+                    Text("Add Article")
+                        .font(.callout)
+                }
+            }
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, vm.urls.isEmpty ? 6 : 4)
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.borderless)
+        .help("Add a Wikipedia article URL")
+    }
+
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-
         // Leading: Settings popover
         ToolbarItem(placement: .navigation) {
             Button {
@@ -62,11 +168,6 @@ struct ContentView: View {
             }
         }
 
-        // Centre: URL chip row (takes all available space in the title area)
-        ToolbarItem(placement: .principal) {
-            urlToolbarField
-        }
-
         // Fetch / status indicator
         ToolbarItem(placement: .automatic) {
             fetchControl
@@ -75,47 +176,6 @@ struct ContentView: View {
         // Export
         ToolbarItem(placement: .primaryAction) {
             exportMenu
-        }
-    }
-
-    // MARK: - URL toolbar field
-
-    private var urlToolbarField: some View {
-        HStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 5) {
-                    Image(systemName: "globe")
-                        .foregroundStyle(.tertiary)
-                        .imageScale(.small)
-                        .padding(.leading, 2)
-
-                    ForEach(vm.urls, id: \.self) { url in
-                        URLChip(urlString: url) { vm.removeURL(url) }
-                    }
-
-                    Button {
-                        showingAddURL = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .imageScale(.small)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Add a Wikipedia article URL")
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            }
-        }
-        .frame(minWidth: 200, maxWidth: 540)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(NSColor.textBackgroundColor))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
-                }
         }
     }
 
@@ -258,11 +318,9 @@ struct ContentView: View {
         let name = personDisplayName(person)
         if person.isStub {
             Label {
-                Text(name)
-                    .foregroundStyle(.secondary)
+                Text(name).foregroundStyle(.secondary)
             } icon: {
-                Image(systemName: "person.badge.clock")
-                    .foregroundStyle(.tertiary)
+                Image(systemName: "person.badge.clock").foregroundStyle(.tertiary)
             }
         } else {
             Label {
@@ -341,11 +399,11 @@ struct ContentView: View {
             }
         } else {
             legacyEmptyView(
-                icon: "person.text.rectangle",
-                title: vm.hasData ? "No person selected" : "No person loaded",
+                icon:   "person.text.rectangle",
+                title:  vm.hasData ? "No person selected" : "No person loaded",
                 detail: vm.hasData
                     ? "Select a person from the sidebar"
-                    : "Click + in the toolbar to add Wikipedia articles, then press ⌘↩"
+                    : "Click + in the URL bar to add Wikipedia articles, then press ⌘↩"
             )
         }
     }
@@ -365,8 +423,8 @@ struct ContentView: View {
             }
         } else {
             legacyEmptyView(
-                icon: "doc.text.magnifyingglass",
-                title: vm.hasData ? "No source selected" : "No sources yet",
+                icon:   "doc.text.magnifyingglass",
+                title:  vm.hasData ? "No source selected" : "No sources yet",
                 detail: vm.hasData
                     ? "Select a source from the sidebar"
                     : "Fetch a Wikipedia article to see its sources"
@@ -381,8 +439,7 @@ struct ContentView: View {
                 .font(.system(size: 56, weight: .thin))
                 .foregroundStyle(.quaternary)
             Text(title)
-                .font(.title2)
-                .fontWeight(.medium)
+                .font(.title2).fontWeight(.medium)
                 .foregroundStyle(.secondary)
             Text(detail)
                 .foregroundStyle(.tertiary)

@@ -34,86 +34,6 @@ public struct EventSectionContent: View {
     }
 }
 
-// MARK: - QuickLook types
-
-private struct QuickLookItem: Identifiable {
-    let id = UUID()
-    let url: String
-    let caption: String
-}
-
-// MARK: - QuickLookOverlay
-
-private struct QuickLookOverlay: View {
-    let item: QuickLookItem
-    let onClose: () -> Void
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Dark frosted-glass background — uses material so content shows through softly
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(Color.black.opacity(0.55))
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                Color.clear.frame(height: 44) // space for close button
-
-                Group {
-                    if let url = URL(string: item.url), !item.url.isEmpty {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fit)
-                                    .shadow(color: .black.opacity(0.4), radius: 24, y: 8)
-                            case .failure:
-                                VStack(spacing: 12) {
-                                    Image(systemName: "photo.badge.exclamationmark")
-                                        .font(.system(size: 48, weight: .thin))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                    Text("Image could not be loaded")
-                                        .foregroundStyle(.white.opacity(0.5))
-                                }
-                            case .empty:
-                                ProgressView().tint(.white)
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                    } else {
-                        Image(systemName: "photo")
-                            .font(.system(size: 48, weight: .thin))
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 32)
-
-                if !item.caption.isEmpty {
-                    Text(item.caption)
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.80))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 16)
-                }
-            }
-
-            // Close button
-            Button(action: onClose) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white)
-                    .opacity(0.85)
-            }
-            .buttonStyle(.plain)
-            .padding(14)
-        }
-        .onExitCommand(perform: onClose)
-    }
-}
-
 // MARK: - Image cache
 
 /// Simple NSCache-backed singleton that stores decoded platform images.
@@ -283,8 +203,6 @@ private struct PrimaryImagePopover: View {
 
 private struct PrimaryImageCell: View {
     @Binding var imageURL: String
-    var isSelected: Bool = false
-    var onSelect: () -> Void = {}
     @State private var showingPopover = false
     @State private var isHovered = false
 
@@ -300,7 +218,7 @@ private struct PrimaryImageCell: View {
                     .padding(5)
             }
             .overlay {
-                if isHovered || isSelected {
+                if isHovered {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .strokeBorder(Color.accentColor, lineWidth: 2)
                 }
@@ -312,7 +230,7 @@ private struct PrimaryImageCell: View {
                 isHovered = hovering
                 if hovering { showingPopover = true }
             }
-            .onTapGesture { onSelect() }
+            .onTapGesture { showingPopover = true }
             #else
             .onTapGesture { showingPopover.toggle() }
             #endif
@@ -372,10 +290,9 @@ private struct MediaItemPopover: View {
 
 private struct MediaGridCell: View {
     @Binding var item: EditableMediaItem
-    var isSelected: Bool = false
     @Binding var isShowingPopover: Bool
-    let onSelect: () -> Void
-    let onHover: (Bool) -> Void
+    let onTap:    () -> Void   // macOS: tap opens the edit popover
+    let onHover:  (Bool) -> Void
     let onRemove: () -> Void
 
     @State private var isHovered = false
@@ -395,7 +312,7 @@ private struct MediaGridCell: View {
                 }
             }
             .overlay {
-                if isHovered || isSelected {
+                if isHovered {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .strokeBorder(Color.accentColor, lineWidth: 2)
                 }
@@ -407,7 +324,7 @@ private struct MediaGridCell: View {
                 isHovered = hovering
                 onHover(hovering)
             }
-            .onTapGesture { onSelect() }
+            .onTapGesture { onTap() }
             #else
             .onTapGesture { isShowingPopover.toggle() }
             #endif
@@ -417,207 +334,38 @@ private struct MediaGridCell: View {
     }
 }
 
-// MARK: - macOS key capture (replaces NSEvent local monitor)
-//
-// Clicking a thumbnail calls controller.grabFocus(), which makes the key view
-// first responder. Key events are then handled directly by the NSView — no
-// ambient global monitor, no first-responder guesswork.
-
-#if os(macOS)
-
-private final class _MediaKeyNSView: NSView {
-    var onSpace:  (() -> Void)?
-    var onEscape: (() -> Void)?
-
-    override var acceptsFirstResponder: Bool { true }
-    override var canBecomeKeyView:      Bool { true }
-    override var isOpaque:              Bool { false }
-
-    // Let AppKit draw the standard blue focus ring around this view.
-    override var focusRingType: NSFocusRingType {
-        get { .exterior }
-        set { }   // always .exterior; ignore attempts to change
-    }
-    override func drawFocusRingMask() {
-        NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8).fill()
-    }
-    override var focusRingMaskBounds: NSRect { bounds }
-
-    // Transparent to mouse — all click events fall through to SwiftUI thumbnails underneath.
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func draw(_ dirtyRect: NSRect) {}   // no visible content; focus ring is drawn by AppKit
-
-    override func keyDown(with event: NSEvent) {
-        switch event.keyCode {
-        case 49: onSpace?()    // space
-        case 53: onEscape?()   // escape
-        default: super.keyDown(with: event)
-        }
-    }
-}
-
-/// Representable that embeds the pre-created NSView into the hierarchy.
-/// Used as a full-size overlay; the NSView's hitTest returns nil so it never
-/// intercepts mouse events — it only handles keyboard events as first responder.
-private struct MediaKeyRepresentable: NSViewRepresentable {
-    let view: _MediaKeyNSView
-    func makeNSView(context: Context) -> _MediaKeyNSView { view }
-    func updateNSView(_ nsView: _MediaKeyNSView, context: Context) {}
-}
-
-@MainActor
-private final class MediaKeyController: ObservableObject {
-    /// Drives the selection highlight; @Published so the grid re-renders on change.
-    @Published var selectedItemID: UUID? = nil
-
-    /// URL and caption captured at click time — no deferred lookup needed.
-    private var pendingURL:     String = ""
-    private var pendingCaption: String = ""
-
-    var onQuickLook: ((QuickLookItem) -> Void)?
-    var onEscape:    (() -> Void)?
-
-    let keyView = _MediaKeyNSView()
-
-    init() {
-        keyView.onSpace  = { [weak self] in self?.triggerQuickLook() }
-        keyView.onEscape = { [weak self] in self?.onEscape?() }
-    }
-
-    /// Called when a thumbnail is clicked; records everything needed for the preview.
-    func select(id: UUID, url: String, caption: String) {
-        selectedItemID  = id
-        pendingURL      = url
-        pendingCaption  = caption
-    }
-
-    /// Clears selection and pending state when the displayed person changes.
-    func clearSelection() {
-        selectedItemID  = nil
-        pendingURL      = ""
-        pendingCaption  = ""
-    }
-
-    func grabFocus() {
-        guard let window = keyView.window else { return }
-        window.makeFirstResponder(keyView)
-    }
-
-    func sync(onQuickLook: @escaping (QuickLookItem) -> Void,
-              onEscape:    @escaping () -> Void) {
-        self.onQuickLook = onQuickLook
-        self.onEscape    = onEscape
-    }
-
-    private func triggerQuickLook() {
-        guard selectedItemID != nil, !pendingURL.isEmpty else { return }
-        onQuickLook?(QuickLookItem(url: pendingURL, caption: pendingCaption))
-    }
-}
-
-#endif
-
 // MARK: - MediaGrid (unified: primary first with star, then additional)
 
 private struct MediaGrid: View {
     @Binding var imageURL: String
     @Binding var items: [EditableMediaItem]
-    var personID:    UUID       = UUID()   // changes when selected person switches
-    var onQuickLook: (QuickLookItem) -> Void = { _ in }
-    var onEscape:    () -> Void = {}
 
     @State private var popoverItemID: UUID? = nil
-
-    // Stable pseudo-ID for the primary image slot (shared across all instances).
-    private static let primaryID = UUID()
-
-    // macOS: selection lives in the controller (reference type) so the key view's
-    // callbacks always see current data.
-    // iOS: plain @State is sufficient; no hardware keyboard involved.
-    #if os(macOS)
-    @StateObject private var controller = MediaKeyController()
-    private var selectedItemID: UUID? { controller.selectedItemID }
-    #else
-    @State private var selectedItemID: UUID? = nil
-    #endif
 
     private let columns = [GridItem(.adaptive(minimum: 88, maximum: 120), spacing: 8)]
 
     var body: some View {
-        #if os(macOS)
-        // Sync callbacks only — no image data needed here since URLs are captured at click time.
-        let _ = controller.sync(onQuickLook: onQuickLook, onEscape: onEscape)
-        #endif
-
         LazyVGrid(columns: columns, spacing: 8) {
             if !imageURL.isEmpty {
-                PrimaryImageCell(
-                    imageURL: $imageURL,
-                    isSelected: selectedItemID == Self.primaryID,
-                    onSelect: {
-                        #if os(macOS)
-                        controller.select(id: Self.primaryID,
-                                          url: imageURL,
-                                          caption: "Primary Image")
-                        controller.grabFocus()
-                        #else
-                        selectedItemID = Self.primaryID
-                        #endif
-                    }
-                )
+                PrimaryImageCell(imageURL: $imageURL)
             }
             ForEach($items) { $item in
                 MediaGridCell(
                     item: $item,
-                    isSelected: selectedItemID == item.id,
                     isShowingPopover: Binding(
                         get: { popoverItemID == item.id },
                         set: { if !$0 { popoverItemID = nil } }
                     ),
-                    onSelect: {
-                        #if os(macOS)
-                        // Capture url/caption at click time so triggerQuickLook
-                        // never needs to look them up later.
-                        controller.select(id: item.id,
-                                          url: item.url,
-                                          caption: item.caption)
-                        controller.grabFocus()
-                        #else
-                        selectedItemID = item.id
-                        #endif
-                    },
-                    onHover: { hovering in
-                        if hovering { popoverItemID = item.id }
-                    },
+                    onTap:    { popoverItemID = item.id },
+                    onHover:  { hovering in if hovering { popoverItemID = item.id } },
                     onRemove: {
-                        if selectedItemID == item.id {
-                            #if os(macOS)
-                            controller.selectedItemID = nil
-                            #else
-                            selectedItemID = nil
-                            #endif
-                        }
                         items.removeAll { $0.id == item.id }
                         popoverItemID = nil
                     }
                 )
             }
         }
-        // Overlay a full-size, mouse-transparent NSView that owns keyboard focus.
-        // AppKit draws the native blue focus ring around it when it is first responder.
-        // hitTest() returns nil on the NSView so all click events reach the thumbnails below.
-        #if os(macOS)
-        .overlay {
-            MediaKeyRepresentable(view: controller.keyView)
-        }
-        // Person switched — clear stale selection and dismiss any open preview.
-        .onChange(of: personID) { _ in
-            controller.clearSelection()
-        }
-        #endif
     }
-
 }
 
 // MARK: - PersonEditorView
@@ -629,7 +377,6 @@ public struct PersonEditorView: View {
         "Identity", "Media", "Birth", "Death",
         "Spouses", "Children", "Parents", "Titled Positions"
     ]
-    @State private var quickLookItem: QuickLookItem? = nil
 
     public init(person: Binding<EditablePerson>) {
         self._person = person
@@ -648,38 +395,26 @@ public struct PersonEditorView: View {
     }
 
     public var body: some View {
-        ZStack {
-            Form {
-                identitySection
-                mediaSection
-                birthSection
-                deathSection
-                burialSection
-                baptismSection
-                titledPositionsSection
-                customEventsSection
-                personFactsSection
-                honorificsSection
-                spousesSection
-                childrenSection
-                parentsSection
-                occupationsSection
-                otherSection
-                notesSection
-                aiAnalysisSection
-            }
-            .formStyle(.grouped)
-
-            if let item = quickLookItem {
-                QuickLookOverlay(item: item) { quickLookItem = nil }
-                    .id(item.id)   // force full recreation so AsyncImage reloads
-                    .transition(.opacity.animation(.easeInOut(duration: 0.12)))
-            }
+        Form {
+            identitySection
+            mediaSection
+            birthSection
+            deathSection
+            burialSection
+            baptismSection
+            titledPositionsSection
+            customEventsSection
+            personFactsSection
+            honorificsSection
+            spousesSection
+            childrenSection
+            parentsSection
+            occupationsSection
+            otherSection
+            notesSection
+            aiAnalysisSection
         }
-        // Dismiss preview and clear media selection when switching to a different person.
-        .onChange(of: person.id) { _ in
-            quickLookItem = nil
-        }
+        .formStyle(.grouped)
     }
 
     // MARK: - Identity
@@ -719,11 +454,8 @@ public struct PersonEditorView: View {
             DisclosureGroup(isExpanded: isExpanded("Media")) {
                 if !person.imageURL.isEmpty || !person.additionalMedia.isEmpty {
                     MediaGrid(
-                        imageURL:    $person.imageURL,
-                        items:       $person.additionalMedia,
-                        personID:    person.id,
-                        onQuickLook: { quickLookItem = $0 },
-                        onEscape:    { quickLookItem = nil }
+                        imageURL: $person.imageURL,
+                        items:    $person.additionalMedia
                     )
                     .padding(.vertical, 4)
                 }
