@@ -2,50 +2,78 @@ import SwiftUI
 import WikipediaScraperSharedUI
 
 struct LLMSettingsView: View {
+    @Binding var useNotes:     Bool
+    @Binding var useAllImages: Bool
+    @Binding var noPeople:     Bool
+
     @ObservedObject private var llm = LLMSettings.shared
 
     var body: some View {
         Form {
+            // MARK: Fetch Options
+            Section {
+                Toggle(isOn: $useNotes) {
+                    Label("Notes", systemImage: "doc.plaintext")
+                }
+                .help("Include Wikipedia article sections as GEDCOM notes")
+
+                Toggle(isOn: $useAllImages) {
+                    Label("All Images", systemImage: "photo.stack")
+                }
+                .help("Download all article images into the ZIP export")
+
+                Toggle(isOn: $noPeople) {
+                    Label("Main Person Only", systemImage: "person.fill.badge.minus")
+                }
+                .help("Export only the main person — exclude family member stubs")
+            } header: {
+                Text("Fetch Options")
+            }
+
+            // MARK: AI Analysis
             Section {
                 Toggle("Enable AI Analysis", isOn: $llm.isEnabled)
-                    .help("Use Claude AI to extract alternate names, titles, facts, events, and influential people from Wikipedia articles.")
+                    .help("Use Claude AI to extract alternate names, titles, facts, events, and influential people.")
 
-                LabeledContent("API Key") {
-                    HStack(spacing: 6) {
-                        SecureField("sk-ant-…", text: $llm.apiKey)
-                            .textFieldStyle(.squareBorder)
-                            .frame(maxWidth: 300)
-                        if !llm.apiKey.isEmpty {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .imageScale(.small)
+                if llm.isEnabled {
+                    LabeledContent("API Key") {
+                        HStack(spacing: 6) {
+                            SecureField("sk-ant-…", text: $llm.apiKey)
+                                .textFieldStyle(.squareBorder)
+                            if !llm.apiKey.isEmpty {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .imageScale(.small)
+                            }
                         }
                     }
+                    .help("Your Anthropic API key — get one at console.anthropic.com")
                 }
-                .help("Your Anthropic API key. Get one at console.anthropic.com.")
-
             } header: {
                 Label("Claude AI (Anthropic)", systemImage: "wand.and.stars")
-                    .font(.headline)
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("LLM-generated data is stored separately in the GEDCOM file and cited as \u{201C}Claude AI (Anthropic)\u{201D} so it can be distinguished from Wikipedia infobox data.")
+                    Text("AI-generated data is stored separately in the GEDCOM and cited as \u{201C}Claude AI (Anthropic)\u{201D}.")
                     if llm.isEnabled && llm.apiKey.isEmpty {
                         Label("An API key is required to use AI Analysis.", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
-                            .font(.callout)
                             .padding(.top, 2)
                     }
                 }
-                .foregroundStyle(.secondary)
                 .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 220)
+        .frame(width: 320)
+        .animation(.easeInOut(duration: 0.15), value: llm.isEnabled)
     }
 }
 
 #Preview {
-    LLMSettingsView()
+    LLMSettingsView(
+        useNotes:     .constant(false),
+        useAllImages: .constant(false),
+        noPeople:     .constant(false)
+    )
 }

@@ -6,7 +6,8 @@ struct ContentView: View {
     @StateObject private var vm = PersonViewModel()
     @State private var sidebarTab: SidebarTab = .people
     @State private var selectedSourceID: UUID? = nil
-    @State private var showingAddURL = false
+    @State private var showingAddURL    = false
+    @State private var showingSettings  = false
 
     enum SidebarTab: String, CaseIterable {
         case people  = "People"
@@ -41,27 +42,29 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
 
-        // Leading: Settings / AI indicator
+        // Leading: Settings popover
         ToolbarItem(placement: .navigation) {
             Button {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                showingSettings.toggle()
             } label: {
                 Image(systemName: LLMSettings.shared.isEnabled ? "wand.and.stars" : "gearshape")
                     .symbolRenderingMode(.hierarchical)
             }
             .help(LLMSettings.shared.isEnabled
                   ? "AI Analysis is enabled — click to configure"
-                  : "Open Settings (⌘,)")
+                  : "Settings")
+            .popover(isPresented: $showingSettings, arrowEdge: .top) {
+                LLMSettingsView(
+                    useNotes:     $vm.useNotes,
+                    useAllImages: $vm.useAllImages,
+                    noPeople:     $vm.noPeople
+                )
+            }
         }
 
         // Centre: URL chip row (takes all available space in the title area)
         ToolbarItem(placement: .principal) {
             urlToolbarField
-        }
-
-        // Fetch options — icon toggles grouped together
-        ToolbarItem(placement: .automatic) {
-            fetchOptionToggles
         }
 
         // Fetch / status indicator
@@ -113,27 +116,6 @@ struct ContentView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
                 }
-        }
-    }
-
-    // MARK: - Option toggles
-
-    private var fetchOptionToggles: some View {
-        ControlGroup {
-            Toggle(isOn: $vm.useNotes) {
-                Label("Notes", systemImage: "doc.plaintext")
-            }
-            .help("Include Wikipedia article sections as GEDCOM notes")
-
-            Toggle(isOn: $vm.useAllImages) {
-                Label("All Images", systemImage: "photo.stack")
-            }
-            .help("Download all article images into the ZIP export")
-
-            Toggle(isOn: $vm.noPeople) {
-                Label("Main Person Only", systemImage: "person.fill.badge.minus")
-            }
-            .help("Export only the main person — exclude family member stubs")
         }
     }
 
