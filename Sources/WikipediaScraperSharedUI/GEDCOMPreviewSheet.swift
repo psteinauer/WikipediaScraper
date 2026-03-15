@@ -12,6 +12,12 @@ public struct GEDCOMPreviewSheet: View {
     public let filename: String
     @Environment(\.dismiss) private var dismiss
 
+    // Font size: 10–20 pt, default 12
+    @State private var fontSize: CGFloat = 12
+
+    private let minFontSize: CGFloat = 8
+    private let maxFontSize: CGFloat = 24
+
     public init(gedcom: String, filename: String) {
         self.gedcom   = gedcom
         self.filename = filename
@@ -34,7 +40,7 @@ public struct GEDCOMPreviewSheet: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Image(systemName: "doc.text")
                 .foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 1) {
@@ -46,6 +52,34 @@ public struct GEDCOMPreviewSheet: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            // Font-size controls
+            HStack(spacing: 2) {
+                Button { fontSize = max(minFontSize, fontSize - 1) } label: {
+                    Image(systemName: "minus")
+                        .frame(width: 20, height: 20)
+                }
+                .disabled(fontSize <= minFontSize)
+                .buttonStyle(.borderless)
+                .help("Decrease font size")
+
+                Text("\(Int(fontSize)) pt")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 36, alignment: .center)
+                    .monospacedDigit()
+
+                Button { fontSize = min(maxFontSize, fontSize + 1) } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 20, height: 20)
+                }
+                .disabled(fontSize >= maxFontSize)
+                .buttonStyle(.borderless)
+                .help("Increase font size")
+            }
+            .padding(.horizontal, 4)
+
+            Divider().frame(height: 20)
+
             copyButton
             #if os(macOS)
             saveButton
@@ -61,11 +95,12 @@ public struct GEDCOMPreviewSheet: View {
     // MARK: - Body
 
     private var gedcomBody: some View {
-        ScrollView([.horizontal, .vertical]) {
+        ScrollView(.vertical) {
             Text(gedcom)
-                .font(.system(.caption, design: .monospaced))
+                .font(.system(size: fontSize, design: .monospaced))
                 .textSelection(.enabled)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .lineLimit(nil)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 .padding(14)
         }
         .background(gedcomBackground)
