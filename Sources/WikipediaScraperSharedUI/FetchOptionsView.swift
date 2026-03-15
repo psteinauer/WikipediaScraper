@@ -22,6 +22,12 @@ public struct FetchOptionsView: View {
     }
 
     public var body: some View {
+        #if os(macOS)
+        card
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .animation(.easeInOut(duration: 0.18), value: llm.isEnabled)
+        #else
         VStack(alignment: .leading, spacing: 0) {
             optionsRow
             if llm.isEnabled {
@@ -32,18 +38,57 @@ public struct FetchOptionsView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .animation(.easeInOut(duration: 0.18), value: llm.isEnabled)
+        #endif
     }
 
-    // MARK: - Options row
+    // MARK: - Card (macOS only)
+
+    #if os(macOS)
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(Color.accentColor)
+                    .imageScale(.small)
+                    .frame(width: 20, alignment: .center)
+                Text("Fetch Options")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                optionToggle("wand.and.stars",         "AI Analysis",      "Enrich with Claude AI (LLM)",                      $llm.isEnabled)
+                optionToggle("doc.plaintext",           "Notes",            "Include Wikipedia sections as GEDCOM notes",       $useNotes)
+                optionToggle("photo.stack",             "All Images",       "Download all article images into ZIP export",      $useAllImages)
+                optionToggle("person.fill.badge.minus", "Main Person Only", "Export only the searched person, no family stubs", $noPeople)
+                if llm.isEnabled {
+                    apiKeyRow
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .background(Color(NSColor.controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.07), radius: 3, x: 0, y: 1)
+    }
+    #endif
+
+    // MARK: - Options row (iOS/iPadOS)
 
     private var optionsRow: some View {
         #if os(macOS)
-        VStack(alignment: .leading, spacing: 6) {
-            optionToggle("wand.and.stars",         "AI Analysis",      "Enrich with Claude AI (LLM)",                      $llm.isEnabled)
-            optionToggle("doc.plaintext",           "Notes",            "Include Wikipedia sections as GEDCOM notes",       $useNotes)
-            optionToggle("photo.stack",             "All Images",       "Download all article images into ZIP export",      $useAllImages)
-            optionToggle("person.fill.badge.minus", "Main Person Only", "Export only the searched person, no family stubs", $noPeople)
-        }
+        EmptyView() // unused — macOS uses card
         #else
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
