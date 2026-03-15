@@ -24,8 +24,8 @@ public struct FetchOptionsView: View {
     public var body: some View {
         #if os(macOS)
         card
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .animation(.easeInOut(duration: 0.18), value: llm.isEnabled)
         #else
         VStack(alignment: .leading, spacing: 0) {
@@ -74,7 +74,7 @@ public struct FetchOptionsView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
         }
-        .background(Color(NSColor.controlBackgroundColor))
+        .background(Color(NSColor.windowBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
