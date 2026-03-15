@@ -584,7 +584,12 @@ public struct PersonEditorView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                nameAndGenderSection
+                HStack(alignment: .top, spacing: 12) {
+                    nameAndGenderSection
+                    if !person.imageURL.isEmpty {
+                        MediaThumbnail(urlString: person.imageURL, width: 84, height: 106)
+                    }
+                }
                 eventsSection
                 factsSection
                 additionalNamesSection
