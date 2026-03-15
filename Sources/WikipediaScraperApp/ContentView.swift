@@ -175,11 +175,7 @@ struct ContentView: View {
                   ? "AI Analysis is enabled — click to configure"
                   : "Settings")
             .popover(isPresented: $showingSettings, arrowEdge: .top) {
-                LLMSettingsView(
-                    useNotes:     $vm.useNotes,
-                    useAllImages: $vm.useAllImages,
-                    noPeople:     $vm.noPeople
-                )
+                LLMSettingsView()
             }
         }
 
@@ -244,6 +240,14 @@ struct ContentView: View {
 
     private var sidebarContent: some View {
         VStack(spacing: 0) {
+            FetchOptionsView(
+                useNotes:     $vm.useNotes,
+                useAllImages: $vm.useAllImages,
+                noPeople:     $vm.noPeople
+            )
+
+            Divider()
+
             if let err = vm.errorMessage {
                 errorBanner(message: err)
                     .transition(.move(edge: .top).combined(with: .opacity))
