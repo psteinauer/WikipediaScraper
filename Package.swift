@@ -60,5 +60,11 @@ let package = Package(
                 .process("Assets.xcassets"),
             ]
         ),
+
+        .testTarget(
+            name: "WikipediaScraperTests",
+            dependencies: ["WikipediaScraperCore"],
+            path: "Tests/WikipediaScraperTests"
+        ),
     ]
 )
