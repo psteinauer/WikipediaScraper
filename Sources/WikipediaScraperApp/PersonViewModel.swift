@@ -7,8 +7,8 @@ import WikipediaScraperSharedUI
 
 @MainActor
 final class PersonViewModel: ObservableObject {
-    @Published var urlString: String = "" {
-        didSet { UserDefaults.standard.set(urlString, forKey: "last_url_string") }
+    @Published var urls: [String] = [] {
+        didSet { UserDefaults.standard.set(urls, forKey: "url_list") }
     }
     @Published var persons: [EditablePerson] = []
     @Published var selectedPersonID: UUID? = nil
@@ -31,10 +31,19 @@ final class PersonViewModel: ObservableObject {
     }
 
     init() {
-        urlString    = UserDefaults.standard.string(forKey: "last_url_string") ?? ""
+        urls         = UserDefaults.standard.stringArray(forKey: "url_list") ?? []
         useNotes     = UserDefaults.standard.bool(forKey: "fetch_use_notes")
         useAllImages = UserDefaults.standard.bool(forKey: "fetch_use_all_images")
         noPeople     = UserDefaults.standard.bool(forKey: "fetch_no_people")
+    }
+
+    func addURL(_ urlString: String) {
+        guard !urls.contains(urlString) else { return }
+        urls.append(urlString)
+    }
+
+    func removeURL(_ urlString: String) {
+        urls.removeAll { $0 == urlString }
     }
 
     var hasData: Bool { persons.contains { !$0.isStub } }
@@ -152,21 +161,9 @@ final class PersonViewModel: ObservableObject {
         rebuildStubs()
     }
 
-    // MARK: - URL parsing
-
-    private func parseURLs(_ input: String) -> [String] {
-        // Split on whitespace/newlines only — commas can appear inside Wikipedia
-        // article URLs (e.g. "Edmund_Beaufort,_2nd_Duke_of_Somerset"), so we only
-        // strip leading/trailing commas from each token rather than splitting on them.
-        return input.components(separatedBy: CharacterSet.whitespaces.union(.newlines))
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ",")) }
-            .filter { !$0.isEmpty }
-    }
-
     // MARK: - Fetch
 
     func fetch() async {
-        let urls = parseURLs(urlString)
         guard !urls.isEmpty else { return }
 
         errorMessage = nil

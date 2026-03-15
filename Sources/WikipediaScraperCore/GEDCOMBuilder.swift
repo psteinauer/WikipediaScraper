@@ -298,6 +298,7 @@ public struct GEDCOMBuilder {
         line(0, "HEAD")
         line(1, "GEDC")
         line(2, "VERS 7.0")
+        line(1, "CHAR UTF-8")
         line(1, "LANG en")
         line(1, "SOUR WikipediaScraper")
         line(2, "VERS 1.0")

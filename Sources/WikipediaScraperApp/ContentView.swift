@@ -6,6 +6,7 @@ struct ContentView: View {
     @StateObject private var vm = PersonViewModel()
     @State private var sidebarTab: SidebarTab = .people
     @State private var selectedSourceID: UUID? = nil
+    @State private var showingAddURL = false
 
     enum SidebarTab: String, CaseIterable {
         case people  = "People"
@@ -57,11 +58,28 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .imageScale(.medium)
 
-            TextField("Paste a Wikipedia article URL…", text: $vm.urlString)
-                .textFieldStyle(.plain)
-                .onSubmit { Task { await vm.fetch() } }
-                .disabled(vm.isLoading)
+            // Scrollable chip list
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(vm.urls, id: \.self) { url in
+                        URLChip(urlString: url) { vm.removeURL(url) }
+                    }
+                    // + button
+                    Button {
+                        showingAddURL = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .imageScale(.medium)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Add a Wikipedia article URL")
+                }
+                .padding(.vertical, 2)
+            }
+            .frame(maxWidth: .infinity)
 
+            // Fetch / status
             Group {
                 if vm.isLoading {
                     ProgressView()
@@ -78,10 +96,10 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "arrow.right.circle.fill")
                             .imageScale(.large)
-                            .foregroundStyle(vm.urlString.isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor)
+                            .foregroundStyle(vm.urls.isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor)
                     }
                     .buttonStyle(.borderless)
-                    .disabled(vm.urlString.isEmpty)
+                    .disabled(vm.urls.isEmpty)
                     .keyboardShortcut(.return, modifiers: .command)
                 }
             }
@@ -96,6 +114,9 @@ struct ContentView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
                 }
+        }
+        .sheet(isPresented: $showingAddURL) {
+            AddURLSheet { url in vm.addURL(url) }
         }
     }
 
@@ -236,7 +257,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Text(vm.hasData
                  ? "Select a person from the sidebar"
-                 : "Paste a Wikipedia biography URL above and press Return or ⌘↩")
+                 : "Click + in the URL bar to add Wikipedia articles, then press ⌘↩")
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
             Spacer()

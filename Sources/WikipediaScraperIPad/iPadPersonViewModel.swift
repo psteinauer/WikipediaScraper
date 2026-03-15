@@ -44,8 +44,8 @@ struct ZIPDocument: FileDocument {
 
 @MainActor
 final class iPadPersonViewModel: ObservableObject {
-    @Published var urlString: String = "" {
-        didSet { UserDefaults.standard.set(urlString, forKey: "last_url_string") }
+    @Published var urls: [String] = [] {
+        didSet { UserDefaults.standard.set(urls, forKey: "url_list") }
     }
     @Published var persons: [EditablePerson] = []
     @Published var selectedPersonID: UUID? = nil
@@ -74,10 +74,19 @@ final class iPadPersonViewModel: ObservableObject {
     }
 
     init() {
-        urlString    = UserDefaults.standard.string(forKey: "last_url_string") ?? ""
+        urls         = UserDefaults.standard.stringArray(forKey: "url_list") ?? []
         useNotes     = UserDefaults.standard.bool(forKey: "fetch_use_notes")
         useAllImages = UserDefaults.standard.bool(forKey: "fetch_use_all_images")
         noPeople     = UserDefaults.standard.bool(forKey: "fetch_no_people")
+    }
+
+    func addURL(_ urlString: String) {
+        guard !urls.contains(urlString) else { return }
+        urls.append(urlString)
+    }
+
+    func removeURL(_ urlString: String) {
+        urls.removeAll { $0 == urlString }
     }
 
     var hasData: Bool { persons.contains { !$0.isStub } }
@@ -193,18 +202,9 @@ final class iPadPersonViewModel: ObservableObject {
         rebuildStubs()
     }
 
-    // MARK: - URL parsing
-
-    private func parseURLs(_ input: String) -> [String] {
-        return input.components(separatedBy: CharacterSet.whitespaces.union(.newlines))
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ",")) }
-            .filter { !$0.isEmpty }
-    }
-
     // MARK: - Fetch
 
     func fetch() async {
-        let urls = parseURLs(urlString)
         guard !urls.isEmpty else { return }
 
         errorMessage = nil

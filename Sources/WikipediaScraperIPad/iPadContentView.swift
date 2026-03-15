@@ -51,6 +51,7 @@ private struct iPadLLMSettingsView: View {
 struct iPadContentView: View {
     @StateObject private var vm = iPadPersonViewModel()
     @State private var showingSettings = false
+    @State private var showingAddURL = false
     @State private var sidebarTab: SidebarTab = .people
     @State private var selectedSourceID: UUID? = nil
 
@@ -115,19 +116,33 @@ struct iPadContentView: View {
             Image(systemName: "globe")
                 .foregroundStyle(.secondary)
 
-            TextField("Paste a Wikipedia article URL…", text: $vm.urlString)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                .onSubmit { Task { await vm.fetch() } }
-                .disabled(vm.isLoading)
+            // Scrollable chip list
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(vm.urls, id: \.self) { url in
+                        URLChip(urlString: url) { vm.removeURL(url) }
+                    }
+                    Button {
+                        showingAddURL = true
+                    } label: {
+                        Image(systemName: "plus.circle")
+                            .imageScale(.large)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .padding(.vertical, 2)
+            }
+            .frame(maxWidth: .infinity)
 
             fetchControl
                 .frame(minWidth: 30, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .sheet(isPresented: $showingAddURL) {
+            AddURLSheet { url in vm.addURL(url) }
+        }
     }
 
     @ViewBuilder
@@ -146,9 +161,9 @@ struct iPadContentView: View {
             } label: {
                 Image(systemName: "arrow.right.circle.fill")
                     .imageScale(.large)
-                    .foregroundStyle(vm.urlString.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint))
+                    .foregroundStyle(vm.urls.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint))
             }
-            .disabled(vm.urlString.isEmpty)
+            .disabled(vm.urls.isEmpty)
         }
     }
 
