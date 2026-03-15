@@ -271,30 +271,14 @@ final class iPadPersonViewModel: ObservableObject {
                     excludingURL: primaryURL,
                     verbose:      false)
 
-                statusMessage = multi ? "Validating images (\(index + 1)/\(total))…" : "Validating images…"
-                var validMedia: [EditableMediaItem] = []
-                var failedTitles: [String] = []
-                await withTaskGroup(of: (EditableMediaItem, String, Bool).self) { group in
-                    for info in infos {
-                        group.addTask {
-                            var item = EditableMediaItem()
-                            item.url     = info.url
-                            item.caption = info.title
-                                .replacingOccurrences(of: "File:", with: "")
-                                .replacingOccurrences(of: "_", with: " ")
-                            let ok = await WikipediaClient.isImageReachable(info.url)
-                            return (item, info.title, ok)
-                        }
-                    }
-                    for await (item, title, ok) in group {
-                        if ok { validMedia.append(item) } else { failedTitles.append(title) }
-                    }
+                editable.additionalMedia = infos.map { info in
+                    var item = EditableMediaItem()
+                    item.url     = info.url
+                    item.caption = info.title
+                        .replacingOccurrences(of: "File:", with: "")
+                        .replacingOccurrences(of: "_", with: " ")
+                    return item
                 }
-                let order = infos.map(\.url)
-                editable.additionalMedia = validMedia.sorted {
-                    (order.firstIndex(of: $0.url) ?? 0) < (order.firstIndex(of: $1.url) ?? 0)
-                }
-                if !failedTitles.isEmpty { mediaWarnings += failedTitles }
             } catch { /* non-fatal */ }
         }
 

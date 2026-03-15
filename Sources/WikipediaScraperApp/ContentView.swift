@@ -14,15 +14,12 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBar
-            NavigationSplitView {
-                sidebarContent
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
-            } detail: {
-                detailContent
-                    .navigationTitle(detailTitle)
-            }
+        NavigationSplitView {
+            sidebarContent
+                .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+        } detail: {
+            detailContent
+                .navigationTitle(detailTitle)
         }
         .toolbar { toolbarContent }
         .focusedValue(\.personViewModel, vm)
@@ -34,87 +31,81 @@ struct ContentView: View {
         } message: {
             Text(vm.mediaWarnings.joined(separator: "\n"))
         }
-    }
-
-    // MARK: - Top Bar (spans full window width)
-
-    private var topBar: some View {
-        VStack(spacing: 0) {
-            urlBar
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-            Divider()
-            FetchOptionsView(
-                useNotes:     $vm.useNotes,
-                useAllImages: $vm.useAllImages,
-                noPeople:     $vm.noPeople
-            )
-            .background(Color(NSColor.windowBackgroundColor))
-            if let err = vm.errorMessage {
-                Divider()
-                errorBanner(message: err)
-            }
-            Divider()
+        .sheet(isPresented: $showingAddURL) {
+            AddURLSheet { url in vm.addURL(url) }
         }
     }
 
-    // MARK: - URL Bar
+    // MARK: - Toolbar
 
-    private var urlBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "globe")
-                .foregroundStyle(.secondary)
-                .imageScale(.medium)
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
 
-            // Scrollable chip list
+        // Leading: Settings / AI indicator
+        ToolbarItem(placement: .navigation) {
+            Button {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: {
+                Image(systemName: LLMSettings.shared.isEnabled ? "wand.and.stars" : "gearshape")
+                    .symbolRenderingMode(.hierarchical)
+            }
+            .help(LLMSettings.shared.isEnabled
+                  ? "AI Analysis is enabled — click to configure"
+                  : "Open Settings (⌘,)")
+        }
+
+        // Centre: URL chip row (takes all available space in the title area)
+        ToolbarItem(placement: .principal) {
+            urlToolbarField
+        }
+
+        // Fetch options — icon toggles grouped together
+        ToolbarItem(placement: .automatic) {
+            fetchOptionToggles
+        }
+
+        // Fetch / status indicator
+        ToolbarItem(placement: .automatic) {
+            fetchControl
+        }
+
+        // Export
+        ToolbarItem(placement: .primaryAction) {
+            exportMenu
+        }
+    }
+
+    // MARK: - URL toolbar field
+
+    private var urlToolbarField: some View {
+        HStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: "globe")
+                        .foregroundStyle(.tertiary)
+                        .imageScale(.small)
+                        .padding(.leading, 2)
+
                     ForEach(vm.urls, id: \.self) { url in
                         URLChip(urlString: url) { vm.removeURL(url) }
                     }
-                    // + button
+
                     Button {
                         showingAddURL = true
                     } label: {
-                        Image(systemName: "plus.circle")
-                            .imageScale(.medium)
+                        Image(systemName: "plus")
+                            .imageScale(.small)
+                            .fontWeight(.semibold)
                             .foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.borderless)
                     .help("Add a Wikipedia article URL")
                 }
-                .padding(.vertical, 2)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
-            .frame(maxWidth: .infinity)
-
-            // Fetch / status
-            Group {
-                if vm.isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else if let status = vm.statusMessage {
-                    Text(status)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .transition(.opacity.animation(.easeOut))
-                } else {
-                    Button {
-                        Task { await vm.fetch() }
-                    } label: {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .imageScale(.large)
-                            .foregroundStyle(vm.urls.isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor)
-                    }
-                    .buttonStyle(.borderless)
-                    .disabled(vm.urls.isEmpty)
-                    .keyboardShortcut(.return, modifiers: .command)
-                }
-            }
-            .frame(minWidth: 22, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .frame(minWidth: 200, maxWidth: 540)
         .background {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color(NSColor.textBackgroundColor))
@@ -123,35 +114,82 @@ struct ContentView: View {
                         .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
                 }
         }
-        .sheet(isPresented: $showingAddURL) {
-            AddURLSheet { url in vm.addURL(url) }
+    }
+
+    // MARK: - Option toggles
+
+    private var fetchOptionToggles: some View {
+        ControlGroup {
+            Toggle(isOn: $vm.useNotes) {
+                Label("Notes", systemImage: "doc.plaintext")
+            }
+            .help("Include Wikipedia article sections as GEDCOM notes")
+
+            Toggle(isOn: $vm.useAllImages) {
+                Label("All Images", systemImage: "photo.stack")
+            }
+            .help("Download all article images into the ZIP export")
+
+            Toggle(isOn: $vm.noPeople) {
+                Label("Main Person Only", systemImage: "person.fill.badge.minus")
+            }
+            .help("Export only the main person — exclude family member stubs")
         }
     }
 
-    // MARK: - Error Banner
+    // MARK: - Fetch control
 
     @ViewBuilder
-    private func errorBanner(message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-            Text(message)
-                .foregroundStyle(.red)
-                .font(.callout)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Button("Dismiss") { vm.errorMessage = nil }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
+    private var fetchControl: some View {
+        if vm.isLoading {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                if let status = vm.statusMessage {
+                    Text(status)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .transition(.opacity.animation(.easeOut))
+                }
+            }
+        } else {
+            Button {
+                Task { await vm.fetch() }
+            } label: {
+                Image(systemName: "arrow.right.circle.fill")
+                    .imageScale(.large)
+                    .foregroundStyle(vm.urls.isEmpty ? Color.secondary.opacity(0.3) : Color.accentColor)
+            }
+            .buttonStyle(.borderless)
+            .disabled(vm.urls.isEmpty)
+            .keyboardShortcut(.return, modifiers: .command)
+            .help("Fetch Wikipedia articles (⌘↩)")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.red.opacity(0.07))
     }
 
-    // MARK: - Sidebar (tab picker + list only)
+    // MARK: - Export menu
+
+    private var exportMenu: some View {
+        Menu {
+            Button("Export as GEDCOM…") { vm.saveAsGED() }
+            Button("Export as ZIP…")    { Task { await vm.saveAsZip() } }
+            Divider()
+            Button("Open in MacFamilyTree 11") { Task { await vm.openInMacFamilyTree() } }
+        } label: {
+            Label("Export", systemImage: "square.and.arrow.up")
+        }
+        .disabled(!vm.hasData)
+    }
+
+    // MARK: - Sidebar
 
     private var sidebarContent: some View {
         VStack(spacing: 0) {
+            if let err = vm.errorMessage {
+                errorBanner(message: err)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             Picker("", selection: $sidebarTab) {
                 ForEach(SidebarTab.allCases, id: \.self) { tab in
                     Text(tab.rawValue).tag(tab)
@@ -161,17 +199,48 @@ struct ContentView: View {
             .labelsHidden()
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+
             Divider()
+
             if sidebarTab == .people {
                 peopleList
             } else {
                 sourcesList
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: vm.errorMessage != nil)
         .background(.background)
     }
 
-    // MARK: - People List
+    // MARK: - Error banner
+
+    @ViewBuilder
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .imageScale(.small)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                vm.errorMessage = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .imageScale(.small)
+                    .fontWeight(.semibold)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.red.opacity(0.08))
+    }
+
+    // MARK: - People list
 
     private var peopleList: some View {
         List(vm.persons, selection: $vm.selectedPersonID) { person in
@@ -189,9 +258,15 @@ struct ContentView: View {
         }
         .overlay {
             if vm.persons.isEmpty {
-                Text("No people yet")
-                    .foregroundStyle(.tertiary)
-                    .font(.caption)
+                VStack(spacing: 8) {
+                    Image(systemName: "person.badge.plus")
+                        .font(.system(size: 28, weight: .thin))
+                        .foregroundStyle(.quaternary)
+                    Text("No articles added")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .allowsHitTesting(false)
             }
         }
     }
@@ -200,10 +275,20 @@ struct ContentView: View {
     private func personRow(_ person: EditablePerson) -> some View {
         let name = personDisplayName(person)
         if person.isStub {
-            Label(name, systemImage: "person.badge.clock")
-                .foregroundStyle(.secondary)
+            Label {
+                Text(name)
+                    .foregroundStyle(.secondary)
+            } icon: {
+                Image(systemName: "person.badge.clock")
+                    .foregroundStyle(.tertiary)
+            }
         } else {
-            Label(name, systemImage: person.sex == .female ? "person.circle.fill" : "person.circle")
+            Label {
+                Text(name)
+            } icon: {
+                Image(systemName: person.sex == .female ? "person.circle.fill" : "person.circle")
+                    .foregroundStyle(Color.accentColor)
+            }
         }
     }
 
@@ -214,7 +299,7 @@ struct ContentView: View {
         return full.isEmpty ? "Unknown" : full
     }
 
-    // MARK: - Sources List
+    // MARK: - Sources list
 
     private var sourcesList: some View {
         List(vm.sources, selection: $selectedSourceID) { source in
@@ -223,9 +308,15 @@ struct ContentView: View {
         .listStyle(.sidebar)
         .overlay {
             if vm.sources.isEmpty {
-                Text("No sources yet")
-                    .foregroundStyle(.tertiary)
-                    .font(.caption)
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: 28, weight: .thin))
+                        .foregroundStyle(.quaternary)
+                    Text("No sources yet")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .allowsHitTesting(false)
             }
         }
     }
@@ -253,39 +344,65 @@ struct ContentView: View {
 
     // MARK: - Empty states
 
+    @ViewBuilder
     private var emptyPeopleState: some View {
-        VStack(spacing: 10) {
-            Spacer()
-            Image(systemName: "person.text.rectangle")
-                .font(.system(size: 56, weight: .thin))
-                .foregroundStyle(.quaternary)
-            Text(vm.hasData ? "No person selected" : "No person loaded")
-                .font(.title2)
-                .fontWeight(.medium)
-                .foregroundStyle(.secondary)
-            Text(vm.hasData
-                 ? "Select a person from the sidebar"
-                 : "Click + in the URL bar to add Wikipedia articles, then press ⌘↩")
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-            Spacer()
+        if #available(macOS 14.0, *) {
+            ContentUnavailableView {
+                Label(
+                    vm.hasData ? "No Person Selected" : "No Articles Added",
+                    systemImage: "person.text.rectangle"
+                )
+            } description: {
+                Text(vm.hasData
+                     ? "Select a person from the sidebar."
+                     : "Add a Wikipedia biography URL with the + button, then press ⌘↩.")
+            }
+        } else {
+            legacyEmptyView(
+                icon: "person.text.rectangle",
+                title: vm.hasData ? "No person selected" : "No person loaded",
+                detail: vm.hasData
+                    ? "Select a person from the sidebar"
+                    : "Click + in the toolbar to add Wikipedia articles, then press ⌘↩"
+            )
         }
-        .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder
     private var emptySourceState: some View {
+        if #available(macOS 14.0, *) {
+            ContentUnavailableView {
+                Label(
+                    vm.hasData ? "No Source Selected" : "No Sources Yet",
+                    systemImage: "doc.text.magnifyingglass"
+                )
+            } description: {
+                Text(vm.hasData
+                     ? "Select a source from the sidebar."
+                     : "Fetch a Wikipedia article to see its sources.")
+            }
+        } else {
+            legacyEmptyView(
+                icon: "doc.text.magnifyingglass",
+                title: vm.hasData ? "No source selected" : "No sources yet",
+                detail: vm.hasData
+                    ? "Select a source from the sidebar"
+                    : "Fetch a Wikipedia article to see its sources"
+            )
+        }
+    }
+
+    private func legacyEmptyView(icon: String, title: String, detail: String) -> some View {
         VStack(spacing: 10) {
             Spacer()
-            Image(systemName: "doc.text.magnifyingglass")
+            Image(systemName: icon)
                 .font(.system(size: 56, weight: .thin))
                 .foregroundStyle(.quaternary)
-            Text("No source selected")
+            Text(title)
                 .font(.title2)
                 .fontWeight(.medium)
                 .foregroundStyle(.secondary)
-            Text(vm.hasData
-                 ? "Select a source from the sidebar"
-                 : "Fetch a Wikipedia article to see its sources")
+            Text(detail)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
             Spacer()
@@ -312,26 +429,9 @@ struct ContentView: View {
             return "Sources"
         }
     }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .primaryAction) {
-            Menu {
-                Button("Export as GEDCOM…") { vm.saveAsGED() }
-                Button("Export as ZIP…") { Task { await vm.saveAsZip() } }
-                Divider()
-                Button("Open in MacFamilyTree 11") { Task { await vm.openInMacFamilyTree() } }
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
-            }
-            .disabled(!vm.hasData)
-        }
-    }
 }
 
 #Preview {
     ContentView()
-        .frame(width: 960, height: 720)
+        .frame(width: 1040, height: 740)
 }

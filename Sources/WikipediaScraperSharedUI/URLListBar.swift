@@ -36,14 +36,35 @@ public struct URLChip: View {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 4)
+        #if os(macOS)
+        .background {
+            if #available(macOS 26.0, *) {
+                // Liquid Glass — the chip looks like a frosted glass pill
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(.separator.opacity(0.5), lineWidth: 0.5)
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.accentColor.opacity(0.30), lineWidth: 0.5)
+                    }
+            }
+        }
+        #else
         .background {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.accentColor.opacity(0.10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(0.30), lineWidth: 0.5)
+                }
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.accentColor.opacity(0.30), lineWidth: 0.5)
-        }
+        #endif
     }
 }
 

@@ -19,12 +19,10 @@ extension FocusedValues {
 struct WikipediaScraperApp: App {
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ContentView()
-            }
-            .frame(minWidth: 820, minHeight: 560)
+            ContentView()
+                .frame(minWidth: 820, minHeight: 560)
         }
-        .defaultSize(width: 960, height: 720)
+        .defaultSize(width: 1040, height: 740)
         .commands {
             CommandGroup(replacing: .newItem) {}
             AppCommands()
