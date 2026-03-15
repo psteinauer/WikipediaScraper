@@ -38,12 +38,11 @@ public struct FetchOptionsView: View {
 
     private var optionsRow: some View {
         #if os(macOS)
-        HStack(spacing: 16) {
-            optionToggle("wand.and.stars",         "AI Analysis",      "Enrich with Claude AI (LLM)",                       $llm.isEnabled)
-            optionToggle("doc.plaintext",           "Notes",            "Include Wikipedia sections as GEDCOM notes",        $useNotes)
-            optionToggle("photo.stack",             "All Images",       "Download all article images into ZIP export",        $useAllImages)
-            optionToggle("person.fill.badge.minus", "Main Person Only", "Export only the searched person, no family stubs",  $noPeople)
-            Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            optionToggle("wand.and.stars",         "AI Analysis",      "Enrich with Claude AI (LLM)",                      $llm.isEnabled)
+            optionToggle("doc.plaintext",           "Notes",            "Include Wikipedia sections as GEDCOM notes",       $useNotes)
+            optionToggle("photo.stack",             "All Images",       "Download all article images into ZIP export",      $useAllImages)
+            optionToggle("person.fill.badge.minus", "Main Person Only", "Export only the searched person, no family stubs", $noPeople)
         }
         #else
         ScrollView(.horizontal, showsIndicators: false) {
