@@ -190,7 +190,10 @@ public struct EditableMediaItem: Identifiable {
 
 // MARK: - EditablePerson
 
-public struct EditablePerson {
+public struct EditablePerson: Identifiable {
+    public var id: UUID = UUID()
+    /// True for referenced people (spouses, children, etc.) that haven't been fully fetched.
+    public var isStub: Bool = false
     public var givenName: String = ""
     public var surname: String = ""
     public var birthName: String = ""
@@ -221,6 +224,16 @@ public struct EditablePerson {
     public var wikiTitle:   String = ""
     public var wikiURL:     String = ""
     public var wikiExtract: String = ""
+
+    // ── Pass-through: notes and LLM enrichment (not user-editable) ────────
+    // These are populated by --notes / --llm during fetch and forwarded
+    // unchanged into PersonData when building the GEDCOM.
+    public var wikiSections:      [(title: String, text: String)] = []
+    public var llmAlternateNames: [String]            = []
+    public var llmTitles:         [String]             = []
+    public var llmFacts:          [PersonFact]         = []
+    public var llmEvents:         [CustomEvent]        = []
+    public var influentialPeople: [InfluentialPerson]  = []
 
     public init() {}
 
@@ -253,6 +266,13 @@ public struct EditablePerson {
         self.wikiTitle   = p.wikiTitle   ?? ""
         self.wikiURL     = p.wikiURL     ?? ""
         self.wikiExtract = p.wikiExtract ?? ""
+
+        self.wikiSections      = p.wikiSections
+        self.llmAlternateNames = p.llmAlternateNames
+        self.llmTitles         = p.llmTitles
+        self.llmFacts          = p.llmFacts
+        self.llmEvents         = p.llmEvents
+        self.influentialPeople = p.influentialPeople
     }
 
     public func toPersonData() -> PersonData {
@@ -289,6 +309,13 @@ public struct EditablePerson {
         p.wikiURL         = wikiURL.isEmpty     ? nil : wikiURL
         p.wikiTitle       = wikiTitle.isEmpty   ? nil : wikiTitle
         p.wikiExtract     = wikiExtract.isEmpty ? nil : wikiExtract
+
+        p.wikiSections      = wikiSections
+        p.llmAlternateNames = llmAlternateNames
+        p.llmTitles         = llmTitles
+        p.llmFacts          = llmFacts
+        p.llmEvents         = llmEvents
+        p.influentialPeople = influentialPeople
         return p
     }
 }

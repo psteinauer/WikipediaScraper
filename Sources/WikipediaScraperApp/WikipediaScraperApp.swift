@@ -29,6 +29,10 @@ struct WikipediaScraperApp: App {
             CommandGroup(replacing: .newItem) {}
             AppCommands()
         }
+
+        Settings {
+            LLMSettingsView()
+        }
     }
 }
 

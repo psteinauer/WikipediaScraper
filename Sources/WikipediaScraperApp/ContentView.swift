@@ -4,19 +4,49 @@ import WikipediaScraperSharedUI
 
 struct ContentView: View {
     @StateObject private var vm = PersonViewModel()
+    @State private var sidebarTab: SidebarTab = .people
+    @State private var selectedSourceID: UUID? = nil
+
+    enum SidebarTab: String, CaseIterable {
+        case people  = "People"
+        case sources = "Sources"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            urlBar
-            Divider()
-            if let err = vm.errorMessage {
-                errorBanner(message: err)
+            topBar
+            NavigationSplitView {
+                sidebarContent
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 320)
+            } detail: {
+                detailContent
+                    .navigationTitle(detailTitle)
             }
-            mainContent
         }
-        .navigationTitle(vm.hasData ? vm.person.wikiTitle : "Wikipedia to GEDCOM")
         .toolbar { toolbarContent }
         .focusedValue(\.personViewModel, vm)
+    }
+
+    // MARK: - Top Bar (spans full window width)
+
+    private var topBar: some View {
+        VStack(spacing: 0) {
+            urlBar
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            Divider()
+            FetchOptionsView(
+                useNotes:     $vm.useNotes,
+                useAllImages: $vm.useAllImages,
+                noPeople:     $vm.noPeople
+            )
+            .background(Color(NSColor.windowBackgroundColor))
+            if let err = vm.errorMessage {
+                Divider()
+                errorBanner(message: err)
+            }
+            Divider()
+        }
     }
 
     // MARK: - URL Bar
@@ -67,8 +97,6 @@ struct ContentView: View {
                         .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
                 }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
     }
 
     // MARK: - Error Banner
@@ -89,45 +117,171 @@ struct ContentView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .background(Color.red.opacity(0.07))
-        Divider()
     }
 
-    // MARK: - Main Content
+    // MARK: - Sidebar (tab picker + list only)
 
-    @ViewBuilder
-    private var mainContent: some View {
-        if vm.hasData {
-            ScrollView {
-                PersonEditorView(person: $vm.person)
-                    .padding(.vertical, 8)
+    private var sidebarContent: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $sidebarTab) {
+                ForEach(SidebarTab.allCases, id: \.self) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
             }
-        } else if vm.isLoading {
-            VStack {
-                Spacer()
-                ProgressView("Fetching from Wikipedia…")
-                Spacer()
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            Divider()
+            if sidebarTab == .people {
+                peopleList
+            } else {
+                sourcesList
             }
-            .frame(maxWidth: .infinity)
-        } else {
-            emptyState
+        }
+        .background(.background)
+    }
+
+    // MARK: - People List
+
+    private var peopleList: some View {
+        List(vm.persons, selection: $vm.selectedPersonID) { person in
+            personRow(person)
+        }
+        .listStyle(.sidebar)
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            if let id = ids.first {
+                Button(role: .destructive) {
+                    vm.removePerson(id: id)
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
+        }
+        .overlay {
+            if vm.persons.isEmpty {
+                Text("No people yet")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+            }
         }
     }
 
-    private var emptyState: some View {
+    @ViewBuilder
+    private func personRow(_ person: EditablePerson) -> some View {
+        let name = personDisplayName(person)
+        if person.isStub {
+            Label(name, systemImage: "person.badge.clock")
+                .foregroundStyle(.secondary)
+        } else {
+            Label(name, systemImage: person.sex == .female ? "person.circle.fill" : "person.circle")
+        }
+    }
+
+    private func personDisplayName(_ person: EditablePerson) -> String {
+        if !person.wikiTitle.isEmpty { return person.wikiTitle }
+        let full = [person.givenName, person.surname]
+            .filter { !$0.isEmpty }.joined(separator: " ")
+        return full.isEmpty ? "Unknown" : full
+    }
+
+    // MARK: - Sources List
+
+    private var sourcesList: some View {
+        List(vm.sources, selection: $selectedSourceID) { source in
+            Label(source.name, systemImage: source.icon)
+        }
+        .listStyle(.sidebar)
+        .overlay {
+            if vm.sources.isEmpty {
+                Text("No sources yet")
+                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+            }
+        }
+    }
+
+    // MARK: - Detail
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch sidebarTab {
+        case .people:
+            if let binding = vm.selectedPersonBinding() {
+                PersonEditorView(person: binding)
+            } else {
+                emptyPeopleState
+            }
+        case .sources:
+            if let id = selectedSourceID,
+               let source = vm.sources.first(where: { $0.id == id }) {
+                SourceDetailView(source: source)
+            } else {
+                emptySourceState
+            }
+        }
+    }
+
+    // MARK: - Empty states
+
+    private var emptyPeopleState: some View {
         VStack(spacing: 10) {
             Spacer()
             Image(systemName: "person.text.rectangle")
                 .font(.system(size: 56, weight: .thin))
                 .foregroundStyle(.quaternary)
-            Text("No person loaded")
+            Text(vm.hasData ? "No person selected" : "No person loaded")
                 .font(.title2)
                 .fontWeight(.medium)
                 .foregroundStyle(.secondary)
-            Text("Paste a Wikipedia biography URL above and press Return or ⌘↩")
+            Text(vm.hasData
+                 ? "Select a person from the sidebar"
+                 : "Paste a Wikipedia biography URL above and press Return or ⌘↩")
                 .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
             Spacer()
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var emptySourceState: some View {
+        VStack(spacing: 10) {
+            Spacer()
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 56, weight: .thin))
+                .foregroundStyle(.quaternary)
+            Text("No source selected")
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+            Text(vm.hasData
+                 ? "Select a source from the sidebar"
+                 : "Fetch a Wikipedia article to see its sources")
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Detail title
+
+    private var detailTitle: String {
+        switch sidebarTab {
+        case .people:
+            if let id = vm.selectedPersonID,
+               let p = vm.persons.first(where: { $0.id == id }),
+               !personDisplayName(p).isEmpty {
+                return personDisplayName(p)
+            }
+            return "Wikipedia to GEDCOM"
+        case .sources:
+            if let id = selectedSourceID,
+               let s = vm.sources.first(where: { $0.id == id }) {
+                return s.name
+            }
+            return "Sources"
+        }
     }
 
     // MARK: - Toolbar
@@ -138,6 +292,8 @@ struct ContentView: View {
             Menu {
                 Button("Export as GEDCOM…") { vm.saveAsGED() }
                 Button("Export as ZIP…") { Task { await vm.saveAsZip() } }
+                Divider()
+                Button("Open in MacFamilyTree 11") { Task { await vm.openInMacFamilyTree() } }
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
             }
@@ -147,8 +303,6 @@ struct ContentView: View {
 }
 
 #Preview {
-    NavigationStack {
-        ContentView()
-    }
-    .frame(width: 960, height: 720)
+    ContentView()
+        .frame(width: 960, height: 720)
 }

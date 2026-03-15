@@ -29,6 +29,11 @@ struct WikipediaScraper: AsyncParsableCommand {
                        record on the individual (can be combined with any mode).
           --allimages  Downloads every article image into the GEDZIP archive and
                        links each as an OBJE record. Implies --zip.
+          --llm        Uses Claude AI to enrich the output with additional names,
+                       titles, facts, events, and influential people (ASSO records).
+                       Requires ANTHROPIC_API_KEY env var or --api-key.
+          --summary    Prints a human-readable summary of all exported data
+                       (names, dates, titles, family, facts) to standard output.
 
         GEDZIP STRUCTURE (.zip / .gdz)
           gedcom.ged          GEDCOM 7 file (FILE tags use relative paths)
@@ -50,7 +55,7 @@ struct WikipediaScraper: AsyncParsableCommand {
               https://en.wikipedia.org/wiki/Queen_Victoria \\
               https://en.wikipedia.org/wiki/Prince_Albert
         """,
-        version: "1.4.0"
+        version: "1.5.0"
     )
 
     // MARK: - Arguments & options
@@ -98,6 +103,18 @@ struct WikipediaScraper: AsyncParsableCommand {
           help: "Only create GEDCOM records for the URLs passed on the command line; do not fetch referenced people.")
     var noPeople: Bool = false
 
+    @Flag(name: .customLong("llm"),
+          help: "Use Claude AI to extract additional names, titles, facts, events, and influential people from the article.")
+    var llm: Bool = false
+
+    @Option(name: .customLong("api-key"),
+            help: "Anthropic API key for --llm (defaults to ANTHROPIC_API_KEY environment variable).")
+    var apiKey: String?
+
+    @Flag(name: [.customLong("summary"), .customShort("s")],
+          help: "Print a human-readable summary of the exported data after writing the output file.")
+    var summary: Bool = false
+
     // MARK: - Validation
 
     func validate() throws {
@@ -116,6 +133,9 @@ struct WikipediaScraper: AsyncParsableCommand {
         }
         if allimages, mappings {
             throw ValidationError("--allimages cannot be combined with --mappings.")
+        }
+        if summary, preflight {
+            throw ValidationError("--summary cannot be combined with --preflight (both write to stdout).")
         }
     }
 
@@ -167,6 +187,35 @@ struct WikipediaScraper: AsyncParsableCommand {
                               ?? summary.thumbnail?.source
                               ?? person.imageURL
             person.imageURL = imageSourceURL
+
+            // ── 4b. LLM enrichment (--llm) ────────────────────────────────
+            if llm {
+                let key = apiKey ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? ""
+                if key.isEmpty {
+                    fputs("Warning: --llm requires an Anthropic API key (--api-key or ANTHROPIC_API_KEY env var)\n", stderr)
+                } else {
+                    if verbose { fputs("\(urlLabel)Running LLM analysis…\n", stderr) }
+                    do {
+                        let analysis = try await LLMClient.analyze(
+                            pageTitle: pageTitle,
+                            wikitext:  wikitext,
+                            extract:   summary.extract,
+                            apiKey:    key,
+                            verbose:   verbose)
+
+                        // Store LLM data in separate fields — GEDCOMBuilder will cite
+                        // Claude as the source and add notes to distinguish from infobox data.
+                        let existingNames = Set(person.alternateNames)
+                        person.llmAlternateNames  = analysis.alternateNames.filter { !existingNames.contains($0) }
+                        person.llmTitles          = analysis.additionalTitles
+                        person.llmFacts           = analysis.additionalFacts
+                        person.llmEvents          = analysis.additionalEvents
+                        person.influentialPeople  = analysis.influentialPeople
+                    } catch {
+                        fputs("Warning: LLM analysis failed for \(pageTitle): \(error.localizedDescription)\n", stderr)
+                    }
+                }
+            }
 
             // ── Mappings mode (per URL) ────────────────────────────────────
             if mappings {
@@ -273,6 +322,9 @@ struct WikipediaScraper: AsyncParsableCommand {
                     if let wt = pos.predecessorWikiTitle { toFetch.insert(wt) }
                     if let wt = pos.successorWikiTitle   { toFetch.insert(wt) }
                 }
+                for ip in person.influentialPeople {
+                    if let wt = ip.wikiTitle { toFetch.insert(wt) }
+                }
             }
             toFetch.subtract(fetchedTitles)
 
@@ -350,6 +402,10 @@ struct WikipediaScraper: AsyncParsableCommand {
                         persons[i].titledPositions[j].successorWikiTitle   = nil
                     }
                 }
+
+                // Remove all influential-people references — they generate ASSO
+                // records pointing to other individuals who won't be in the file.
+                persons[i].influentialPeople = []
             }
         }
 
@@ -397,6 +453,14 @@ struct WikipediaScraper: AsyncParsableCommand {
             try data.write(to: destURL, options: .atomic)
             fputs("Written to \(destURL.path)\n", stderr)
         }
+
+        // ── 8. Summary (--summary) ────────────────────────────────────────
+        if summary {
+            // Only summarise the primary persons (not stubs fetched as refs)
+            let primaryCount = wikipediaURLs.count
+            let primaryPersons = Array(persons.prefix(primaryCount))
+            print(buildSummary(persons: primaryPersons))
+        }
     }
 
     // MARK: - Helpers
@@ -427,6 +491,141 @@ struct WikipediaScraper: AsyncParsableCommand {
             if url.lowercased().hasSuffix(".png") { return "png" }
             return "jpg"
         }
+    }
+
+    // MARK: - Export summary (--summary)
+
+    private func buildSummary(persons: [PersonData]) -> String {
+        var out = ""
+        let bar = String(repeating: "─", count: 60)
+
+        for (idx, p) in persons.enumerated() {
+            if idx > 0 { out += "\n" }
+            out += "\(bar)\n"
+
+            // ── Name ──────────────────────────────────────────────────────
+            let displayName = p.wikiTitle ?? p.name ?? "(unknown)"
+            out += "  \(displayName)\n"
+
+            if !p.alternateNames.isEmpty {
+                out += "  Also known as: \(p.alternateNames.joined(separator: " · "))\n"
+            }
+            if let bn = p.birthName {
+                out += "  Birth name: \(bn)\n"
+            }
+
+            // ── Sex ───────────────────────────────────────────────────────
+            switch p.sex {
+            case .male:    out += "  Sex: Male\n"
+            case .female:  out += "  Sex: Female\n"
+            case .unknown: break
+            }
+
+            // ── Life events ───────────────────────────────────────────────
+            out += "\n"
+            if let b = p.birth {
+                let date  = b.date.flatMap { $0.isEmpty ? nil : $0.gedcom } ?? "—"
+                let place = b.place ?? ""
+                out += "  Born:    \(date)\(place.isEmpty ? "" : "  \(place)")\n"
+            }
+            if let bp = p.baptism {
+                let date  = bp.date.flatMap { $0.isEmpty ? nil : $0.gedcom } ?? "—"
+                let place = bp.place ?? ""
+                out += "  Baptism: \(date)\(place.isEmpty ? "" : "  \(place)")\n"
+            }
+            for sp in p.spouses {
+                var line = "  Married: \(sp.name)"
+                if let md = sp.marriageDate, !md.isEmpty { line += "  (\(md.gedcom))" }
+                if let mp = sp.marriagePlace { line += "  \(mp)" }
+                out += line + "\n"
+            }
+            if let d = p.death {
+                let date  = d.date.flatMap { $0.isEmpty ? nil : $0.gedcom } ?? "—"
+                let place = d.place ?? ""
+                var line  = "  Died:    \(date)\(place.isEmpty ? "" : "  \(place)")"
+                if let c = d.cause { line += "  (\(c))" }
+                out += line + "\n"
+            }
+            if let bu = p.burial {
+                let place = bu.place ?? ""
+                let date  = bu.date.flatMap { $0.isEmpty ? nil : $0.gedcom }
+                var line  = "  Buried:"
+                if let d = date { line += "  \(d)" }
+                if !place.isEmpty { line += "  \(place)" }
+                out += line + "\n"
+            }
+
+            // ── Titles / positions ────────────────────────────────────────
+            if !p.honorifics.isEmpty || !p.titledPositions.isEmpty {
+                out += "\n"
+                for h in p.honorifics { out += "  Title:    \(h)\n" }
+                for pos in p.titledPositions {
+                    var line = "  Title:    \(pos.title)"
+                    let start = pos.startDate.flatMap { $0.isEmpty ? nil : $0.gedcom }
+                    let end   = pos.endDate.flatMap   { $0.isEmpty ? nil : $0.gedcom }
+                    if let s = start, let e = end { line += "  (\(s) – \(e))" }
+                    else if let s = start          { line += "  (from \(s))" }
+                    else if let e = end            { line += "  (to \(e))" }
+                    out += line + "\n"
+                }
+            }
+
+            // ── Family ────────────────────────────────────────────────────
+            let fatherName = p.father?.name ?? p.parents.first?.name
+            let motherName = p.mother?.name ?? (p.parents.count >= 2 ? p.parents[1].name : nil)
+            if fatherName != nil || motherName != nil {
+                out += "\n"
+                if let f = fatherName { out += "  Father:  \(f)\n" }
+                if let m = motherName { out += "  Mother:  \(m)\n" }
+            }
+            if !p.children.isEmpty {
+                out += "  Children (\(p.children.count)): \(p.children.map(\.name).joined(separator: ", "))\n"
+            }
+
+            // ── Occupations ───────────────────────────────────────────────
+            if !p.occupations.isEmpty {
+                out += "\n"
+                out += "  Occupations: \(p.occupations.joined(separator: ", "))\n"
+            }
+
+            // ── Custom events ─────────────────────────────────────────────
+            if !p.customEvents.isEmpty {
+                out += "\n"
+                for evt in p.customEvents {
+                    var line = "  Event:   \(evt.type)"
+                    if let d = evt.date, !d.isEmpty { line += "  \(d.gedcom)" }
+                    if let pl = evt.place { line += "  \(pl)" }
+                    out += line + "\n"
+                }
+            }
+
+            // ── Facts ─────────────────────────────────────────────────────
+            if !p.personFacts.isEmpty {
+                out += "\n"
+                for f in p.personFacts {
+                    out += "  \(f.type): \(f.value)\n"
+                }
+            }
+
+            // ── Influential people (LLM) ──────────────────────────────────
+            if !p.influentialPeople.isEmpty {
+                out += "\n"
+                out += "  Influential people:\n"
+                for ip in p.influentialPeople {
+                    var line = "    \(ip.relationship): \(ip.name)"
+                    if let n = ip.note { line += " — \(n)" }
+                    out += line + "\n"
+                }
+            }
+
+            // ── Source ────────────────────────────────────────────────────
+            if let url = p.wikiURL {
+                out += "\n"
+                out += "  Source: \(url)\n"
+            }
+        }
+        out += "\(bar)\n"
+        return out
     }
 
     // MARK: - Verbose progress summary

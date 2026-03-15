@@ -84,13 +84,238 @@ public struct MediaThumbnail: View {
     }
 }
 
+// MARK: - PrimaryImagePopover
+
+private struct PrimaryImagePopover: View {
+    @Binding var imageURL: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MediaThumbnail(urlString: imageURL, width: 160, height: 200)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            HStack(spacing: 4) {
+                Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                Text("Primary Image").font(.caption2).foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("URL").font(.caption2).foregroundStyle(.secondary)
+                TextField("https://…", text: $imageURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                    #if os(iOS)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+            }
+
+            HStack {
+                Spacer()
+                Button(role: .destructive) { imageURL = "" } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.red)
+                .font(.callout)
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+    }
+}
+
+// MARK: - PrimaryImageCell
+
+private struct PrimaryImageCell: View {
+    @Binding var imageURL: String
+    @State private var showingPopover = false
+    @State private var isHovered = false
+
+    var body: some View {
+        MediaThumbnail(urlString: imageURL, width: 88, height: 110)
+            .overlay(alignment: .topLeading) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.yellow)
+                    .padding(3)
+                    .background(.black.opacity(0.45))
+                    .clipShape(Circle())
+                    .padding(5)
+            }
+            .overlay {
+                if isHovered {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
+            .scaleEffect(isHovered ? 1.04 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isHovered)
+            #if os(macOS)
+            .onHover { hovering in
+                isHovered = hovering
+                if hovering { showingPopover = true }
+            }
+            #else
+            .onTapGesture { showingPopover.toggle() }
+            #endif
+            .popover(isPresented: $showingPopover, arrowEdge: .bottom) {
+                PrimaryImagePopover(imageURL: $imageURL)
+            }
+    }
+}
+
+// MARK: - MediaItemPopover
+
+private struct MediaItemPopover: View {
+    @Binding var item: EditableMediaItem
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MediaThumbnail(urlString: item.url, width: 160, height: 200)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("URL").font(.caption2).foregroundStyle(.secondary)
+                    TextField("https://…", text: $item.url)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+                        #if os(iOS)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        #endif
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Caption").font(.caption2).foregroundStyle(.secondary)
+                    TextField("Optional caption", text: $item.caption)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove", systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.red)
+                .font(.callout)
+            }
+        }
+        .padding(14)
+        .frame(width: 240)
+    }
+}
+
+// MARK: - MediaGridCell
+
+private struct MediaGridCell: View {
+    @Binding var item: EditableMediaItem
+    @Binding var isShowingPopover: Bool
+    let onHover: (Bool) -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        MediaThumbnail(urlString: item.url, width: 88, height: 110)
+            .overlay(alignment: .bottom) {
+                if !item.caption.isEmpty {
+                    Text(item.caption)
+                        .font(.system(size: 9))
+                        .lineLimit(2)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity)
+                        .background(.black.opacity(0.55))
+                        .foregroundStyle(.white)
+                }
+            }
+            .overlay {
+                if isHovered {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: 2)
+                }
+            }
+            .scaleEffect(isHovered ? 1.04 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isHovered)
+            #if os(macOS)
+            .onHover { hovering in
+                isHovered = hovering
+                onHover(hovering)
+            }
+            #else
+            .onTapGesture { isShowingPopover.toggle() }
+            #endif
+            .popover(isPresented: $isShowingPopover, arrowEdge: .bottom) {
+                MediaItemPopover(item: $item, onRemove: onRemove)
+            }
+    }
+}
+
+// MARK: - MediaGrid (unified: primary first with star, then additional)
+
+private struct MediaGrid: View {
+    @Binding var imageURL: String
+    @Binding var items: [EditableMediaItem]
+    @State private var popoverItemID: UUID? = nil
+
+    private let columns = [GridItem(.adaptive(minimum: 88, maximum: 120), spacing: 8)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            if !imageURL.isEmpty {
+                PrimaryImageCell(imageURL: $imageURL)
+            }
+            ForEach($items) { $item in
+                MediaGridCell(
+                    item: $item,
+                    isShowingPopover: Binding(
+                        get: { popoverItemID == item.id },
+                        set: { if !$0 { popoverItemID = nil } }
+                    ),
+                    onHover: { hovering in
+                        if hovering { popoverItemID = item.id }
+                    },
+                    onRemove: {
+                        items.removeAll { $0.id == item.id }
+                        popoverItemID = nil
+                    }
+                )
+            }
+        }
+    }
+}
+
 // MARK: - PersonEditorView
 
 public struct PersonEditorView: View {
     @Binding public var person: EditablePerson
 
+    @State private var expandedSections: Set<String> = [
+        "Identity", "Media", "Birth", "Death",
+        "Spouses", "Children", "Parents", "Titled Positions"
+    ]
+
     public init(person: Binding<EditablePerson>) {
         self._person = person
+    }
+
+    private func isExpanded(_ section: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedSections.contains(section) },
+            set: { newValue in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    if newValue { expandedSections.insert(section) }
+                    else        { expandedSections.remove(section) }
+                }
+            }
+        )
     }
 
     public var body: some View {
@@ -110,6 +335,8 @@ public struct PersonEditorView: View {
             parentsSection
             occupationsSection
             otherSection
+            notesSection
+            aiAnalysisSection
         }
         .formStyle(.grouped)
     }
@@ -117,24 +344,29 @@ public struct PersonEditorView: View {
     // MARK: - Identity
 
     private var identitySection: some View {
-        Section("Identity") {
-            LabeledContent("Wikipedia Title") {
-                Text(person.wikiTitle.isEmpty ? "—" : person.wikiTitle)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            LabeledContent("Given Name") { TextField("Given name(s)", text: $person.givenName) }
-            LabeledContent("Surname")    { TextField("Family name",   text: $person.surname) }
-            LabeledContent("Birth Name") { TextField("Name at birth (if different)", text: $person.birthName) }
-            LabeledContent("Sex") {
-                Picker("", selection: $person.sex) {
-                    Text("Unknown").tag(Sex.unknown)
-                    Text("Male").tag(Sex.male)
-                    Text("Female").tag(Sex.female)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Identity")) {
+                LabeledContent("Wikipedia Title") {
+                    Text(person.wikiTitle.isEmpty ? "—" : person.wikiTitle)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 240)
+                LabeledContent("Given Name") { TextField("Given name(s)", text: $person.givenName) }
+                LabeledContent("Surname")    { TextField("Family name",   text: $person.surname) }
+                LabeledContent("Birth Name") { TextField("Name at birth (if different)", text: $person.birthName) }
+                LabeledContent("Sex") {
+                    Picker("", selection: $person.sex) {
+                        Text("Unknown").tag(Sex.unknown)
+                        Text("Male").tag(Sex.male)
+                        Text("Female").tag(Sex.female)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 240)
+                }
+            } label: {
+                Label("Identity", systemImage: "person.text.rectangle")
+                    .font(.headline)
             }
         }
     }
@@ -142,284 +374,439 @@ public struct PersonEditorView: View {
     // MARK: - Media
 
     private var mediaSection: some View {
-        Section("Media") {
-            HStack(alignment: .top, spacing: 14) {
-                MediaThumbnail(urlString: person.imageURL, width: 72, height: 90)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Primary Image")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("https://upload.wikimedia.org/…", text: $person.imageURL)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.caption)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Media")) {
+                if !person.imageURL.isEmpty || !person.additionalMedia.isEmpty {
+                    MediaGrid(imageURL: $person.imageURL, items: $person.additionalMedia)
+                        .padding(.vertical, 4)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(.vertical, 4)
-
-            ForEach($person.additionalMedia) { $item in
-                HStack(alignment: .top, spacing: 14) {
-                    MediaThumbnail(urlString: item.url, width: 56, height: 70)
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField("Image URL", text: $item.url)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.caption)
-                        TextField("Caption (optional)", text: $item.caption)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    Button {
-                        person.additionalMedia.removeAll { $0.id == item.id }
-                    } label: {
-                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                    }
-                    .buttonStyle(.borderless)
+                Button {
+                    person.additionalMedia.append(EditableMediaItem())
+                } label: {
+                    Label("Add Image", systemImage: "plus.circle")
                 }
-                .padding(.vertical, 2)
-            }
-
-            Button {
-                person.additionalMedia.append(EditableMediaItem())
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Media", systemImage: "plus.circle")
+                Label("Media", systemImage: "photo")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Life Events
 
     private var birthSection: some View {
-        Section("Birth") { EventSectionContent(event: $person.birth) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Birth")) {
+                EventSectionContent(event: $person.birth)
+            } label: {
+                Label("Birth", systemImage: "calendar")
+                    .font(.headline)
+            }
+        }
     }
 
     private var deathSection: some View {
-        Section("Death") { EventSectionContent(event: $person.death, showCause: true) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Death")) {
+                EventSectionContent(event: $person.death, showCause: true)
+            } label: {
+                Label("Death", systemImage: "leaf")
+                    .font(.headline)
+            }
+        }
     }
 
     private var burialSection: some View {
-        Section("Burial") { EventSectionContent(event: $person.burial) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Burial")) {
+                EventSectionContent(event: $person.burial)
+            } label: {
+                Label("Burial", systemImage: "mappin")
+                    .font(.headline)
+            }
+        }
     }
 
     private var baptismSection: some View {
-        Section("Baptism") { EventSectionContent(event: $person.baptism) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Baptism")) {
+                EventSectionContent(event: $person.baptism)
+            } label: {
+                Label("Baptism", systemImage: "drop.fill")
+                    .font(.headline)
+            }
+        }
     }
 
     // MARK: - Titled Positions
 
     private var titledPositionsSection: some View {
-        Section("Titled Positions") {
-            ForEach($person.titledPositions) { $pos in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            LabeledContent("Title")       { TextField("e.g. Queen of the United Kingdom", text: $pos.title) }
-                            LabeledContent("From")        { TextField("Start date", text: $pos.startDate) }
-                            LabeledContent("To")          { TextField("End date", text: $pos.endDate) }
-                            LabeledContent("Place")       { TextField("Place", text: $pos.place) }
-                            LabeledContent("Preceded by") { TextField("Predecessor's name", text: $pos.predecessor) }
-                            LabeledContent("Succeeded by"){ TextField("Successor's name", text: $pos.successor) }
-                            LabeledContent("Note")        { TextField("Note", text: $pos.note) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Titled Positions")) {
+                ForEach($person.titledPositions) { $pos in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                LabeledContent("Title")        { TextField("e.g. Queen of the United Kingdom", text: $pos.title) }
+                                LabeledContent("From")         { TextField("Start date", text: $pos.startDate) }
+                                LabeledContent("To")           { TextField("End date", text: $pos.endDate) }
+                                LabeledContent("Place")        { TextField("Place", text: $pos.place) }
+                                LabeledContent("Preceded by")  { TextField("Predecessor's name", text: $pos.predecessor) }
+                                LabeledContent("Succeeded by") { TextField("Successor's name", text: $pos.successor) }
+                                LabeledContent("Note")         { TextField("Note", text: $pos.note) }
+                            }
+                            Button {
+                                person.titledPositions.removeAll { $0.id == pos.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        Button {
-                            person.titledPositions.removeAll { $0.id == pos.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                        }
-                        .buttonStyle(.borderless)
+                        Divider()
                     }
-                    Divider()
                 }
-            }
-            Button {
-                person.titledPositions.append(EditableTitledPosition())
+                Button {
+                    person.titledPositions.append(EditableTitledPosition())
+                } label: {
+                    Label("Add Position", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Position", systemImage: "plus.circle")
+                Label("Titled Positions", systemImage: "crown")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Custom Events
 
     private var customEventsSection: some View {
-        Section("Custom Events") {
-            ForEach($person.customEvents) { $event in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            LabeledContent("Event Type") { TextField("e.g. Coronation, Inauguration", text: $event.type) }
-                            LabeledContent("Date")       { TextField("e.g. 28 JUN 1838", text: $event.date) }
-                            LabeledContent("Place")      { TextField("Place", text: $event.place) }
-                            LabeledContent("Note")       { TextField("Note", text: $event.note) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Custom Events")) {
+                ForEach($person.customEvents) { $event in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                LabeledContent("Event Type") { TextField("e.g. Coronation, Inauguration", text: $event.type) }
+                                LabeledContent("Date")       { TextField("e.g. 28 JUN 1838", text: $event.date) }
+                                LabeledContent("Place")      { TextField("Place", text: $event.place) }
+                                LabeledContent("Note")       { TextField("Note", text: $event.note) }
+                            }
+                            Button {
+                                person.customEvents.removeAll { $0.id == event.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        Button {
-                            person.customEvents.removeAll { $0.id == event.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                        }
-                        .buttonStyle(.borderless)
+                        Divider()
                     }
-                    Divider()
                 }
-            }
-            Button {
-                person.customEvents.append(EditableCustomEvent())
+                Button {
+                    person.customEvents.append(EditableCustomEvent())
+                } label: {
+                    Label("Add Event", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Event", systemImage: "plus.circle")
+                Label("Events", systemImage: "calendar.badge.clock")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Person Facts
 
     private var personFactsSection: some View {
-        Section("Facts") {
-            ForEach($person.personFacts) { $fact in
-                HStack(spacing: 8) {
-                    TextField("Fact type (e.g. House, Award)", text: $fact.type)
-                        .frame(maxWidth: 200)
-                    Divider().frame(height: 18)
-                    TextField("Value", text: $fact.value)
-                    Button {
-                        person.personFacts.removeAll { $0.id == fact.id }
-                    } label: {
-                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Facts")) {
+                ForEach($person.personFacts) { $fact in
+                    HStack(spacing: 8) {
+                        TextField("Fact type (e.g. House, Award)", text: $fact.type)
+                            .frame(maxWidth: 200)
+                        Divider().frame(height: 18)
+                        TextField("Value", text: $fact.value)
+                        Button {
+                            person.personFacts.removeAll { $0.id == fact.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
-                    .buttonStyle(.borderless)
                 }
-            }
-            Button {
-                person.personFacts.append(EditablePersonFact())
+                Button {
+                    person.personFacts.append(EditablePersonFact())
+                } label: {
+                    Label("Add Fact", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Fact", systemImage: "plus.circle")
+                Label("Facts", systemImage: "list.bullet")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Honorifics
 
     private var honorificsSection: some View {
-        Section("Honorifics & Titles") {
-            ForEach(person.honorifics.indices, id: \.self) { index in
-                HStack {
-                    TextField("e.g. Sir, The Right Honourable", text: $person.honorifics[index])
-                    Button {
-                        person.honorifics.remove(at: index)
-                    } label: {
-                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Honorifics")) {
+                ForEach(person.honorifics.indices, id: \.self) { index in
+                    HStack {
+                        TextField("e.g. Sir, The Right Honourable", text: $person.honorifics[index])
+                        Button {
+                            person.honorifics.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
-                    .buttonStyle(.borderless)
                 }
-            }
-            Button {
-                person.honorifics.append("")
+                Button {
+                    person.honorifics.append("")
+                } label: {
+                    Label("Add Honorific", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Honorific", systemImage: "plus.circle")
+                Label("Honorifics & Titles", systemImage: "textformat")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Spouses
 
     private var spousesSection: some View {
-        Section("Spouses") {
-            ForEach($person.spouses) { $spouse in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            LabeledContent("Name")     { TextField("Spouse's full name", text: $spouse.name) }
-                            LabeledContent("Married")  { TextField("Marriage date", text: $spouse.marriageDate) }
-                            LabeledContent("At")       { TextField("Marriage place", text: $spouse.marriagePlace) }
-                            LabeledContent("Divorced") { TextField("Divorce date (if applicable)", text: $spouse.divorceDate) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Spouses")) {
+                ForEach($person.spouses) { $spouse in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .top, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                LabeledContent("Name")     { TextField("Spouse's full name", text: $spouse.name) }
+                                LabeledContent("Married")  { TextField("Marriage date", text: $spouse.marriageDate) }
+                                LabeledContent("At")       { TextField("Marriage place", text: $spouse.marriagePlace) }
+                                LabeledContent("Divorced") { TextField("Divorce date (if applicable)", text: $spouse.divorceDate) }
+                            }
+                            Button {
+                                person.spouses.removeAll { $0.id == spouse.id }
+                            } label: {
+                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
                         }
-                        Button {
-                            person.spouses.removeAll { $0.id == spouse.id }
-                        } label: {
-                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                        }
-                        .buttonStyle(.borderless)
+                        Divider()
                     }
-                    Divider()
                 }
-            }
-            Button {
-                person.spouses.append(EditableSpouse())
+                Button {
+                    person.spouses.append(EditableSpouse())
+                } label: {
+                    Label("Add Spouse", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Spouse", systemImage: "plus.circle")
+                Label("Spouses", systemImage: "person.2")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Children
 
     private var childrenSection: some View {
-        Section("Children") {
-            ForEach($person.children) { $child in
-                HStack {
-                    TextField("Child's full name", text: $child.name)
-                    Button {
-                        person.children.removeAll { $0.id == child.id }
-                    } label: {
-                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Children")) {
+                ForEach($person.children) { $child in
+                    HStack {
+                        TextField("Child's full name", text: $child.name)
+                        Button {
+                            person.children.removeAll { $0.id == child.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
-                    .buttonStyle(.borderless)
                 }
-            }
-            Button {
-                person.children.append(EditablePersonRef())
+                Button {
+                    person.children.append(EditablePersonRef())
+                } label: {
+                    Label("Add Child", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Child", systemImage: "plus.circle")
+                Label("Children", systemImage: "person.2.fill")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Parents
 
     private var parentsSection: some View {
-        Section("Parents") {
-            LabeledContent("Father") { TextField("Father's full name", text: $person.father) }
-            LabeledContent("Mother") { TextField("Mother's full name", text: $person.mother) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Parents")) {
+                LabeledContent("Father") { TextField("Father's full name", text: $person.father) }
+                LabeledContent("Mother") { TextField("Mother's full name", text: $person.mother) }
+            } label: {
+                Label("Parents", systemImage: "person.circle")
+                    .font(.headline)
+            }
         }
     }
 
     // MARK: - Occupations
 
     private var occupationsSection: some View {
-        Section("Occupations") {
-            ForEach(person.occupations.indices, id: \.self) { index in
-                HStack {
-                    TextField("e.g. Monarch, Statesman", text: $person.occupations[index])
-                    Button {
-                        person.occupations.remove(at: index)
-                    } label: {
-                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Occupations")) {
+                ForEach(person.occupations.indices, id: \.self) { index in
+                    HStack {
+                        TextField("e.g. Monarch, Statesman", text: $person.occupations[index])
+                        Button {
+                            person.occupations.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
-                    .buttonStyle(.borderless)
                 }
-            }
-            Button {
-                person.occupations.append("")
+                Button {
+                    person.occupations.append("")
+                } label: {
+                    Label("Add Occupation", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
             } label: {
-                Label("Add Occupation", systemImage: "plus.circle")
+                Label("Occupations", systemImage: "briefcase")
+                    .font(.headline)
             }
-            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Other
 
     private var otherSection: some View {
-        Section("Other") {
-            LabeledContent("Nationality") { TextField("e.g. British", text: $person.nationality) }
-            LabeledContent("Religion")    { TextField("e.g. Church of England", text: $person.religion) }
+        Section {
+            DisclosureGroup(isExpanded: isExpanded("Other")) {
+                LabeledContent("Nationality") { TextField("e.g. British", text: $person.nationality) }
+                LabeledContent("Religion")    { TextField("e.g. Church of England", text: $person.religion) }
+            } label: {
+                Label("Other", systemImage: "ellipsis.circle")
+                    .font(.headline)
+            }
+        }
+    }
+
+    // MARK: - Notes (shown only when article sections were fetched)
+
+    @ViewBuilder
+    private var notesSection: some View {
+        if !person.wikiSections.isEmpty {
+            Section {
+                DisclosureGroup(isExpanded: isExpanded("Notes")) {
+                    ForEach(person.wikiSections, id: \.title) { section in
+                        VStack(alignment: .leading, spacing: 6) {
+                            if !section.title.isEmpty {
+                                Text(section.title)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            Text(section.text)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } label: {
+                    Label("Notes", systemImage: "doc.text")
+                        .font(.headline)
+                }
+            }
+        }
+    }
+
+    // MARK: - AI Analysis (shown only when LLM data is present)
+
+    @ViewBuilder
+    private var aiAnalysisSection: some View {
+        let hasLLM = !person.llmAlternateNames.isEmpty || !person.llmTitles.isEmpty
+            || !person.llmFacts.isEmpty || !person.llmEvents.isEmpty
+            || !person.influentialPeople.isEmpty
+
+        if hasLLM {
+            Section {
+                DisclosureGroup(isExpanded: isExpanded("AI Analysis")) {
+                    if !person.llmAlternateNames.isEmpty {
+                        LabeledContent("Alternate Names") {
+                            Text(person.llmAlternateNames.joined(separator: ", "))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    if !person.llmTitles.isEmpty {
+                        LabeledContent("Additional Titles") {
+                            Text(person.llmTitles.joined(separator: ", "))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    ForEach(person.llmFacts, id: \.type) { fact in
+                        LabeledContent(fact.type) {
+                            Text(fact.value)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    ForEach(person.llmEvents, id: \.type) { event in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(event.type).fontWeight(.medium)
+                            if let date = event.date {
+                                Text(date.gedcom)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let place = event.place {
+                                Text(place)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let note = event.note {
+                                Text(note)
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    ForEach(person.influentialPeople, id: \.name) { person in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(person.name).fontWeight(.medium)
+                                Text("· \(person.relationship)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let note = person.note {
+                                Text(note)
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } label: {
+                    Label("AI Analysis", systemImage: "wand.and.stars")
+                        .font(.headline)
+                }
+            } header: {
+                Text("Claude AI (Anthropic)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

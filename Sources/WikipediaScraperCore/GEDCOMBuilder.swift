@@ -17,8 +17,9 @@ import Foundation
 
 private struct AssocLink {
     var indiID: String
-    var rela:   String   // "Predecessor" or "Successor"
-    var note:   String?  // context, e.g. "as Queen of the United Kingdom"
+    var rela:   String   // e.g. "Predecessor", "Successor", "Mentor", "Rival"
+    var note:   String?  // context note
+    var sourID: String   // which SOUR record to cite
 }
 
 private struct AssocStub {
@@ -57,7 +58,10 @@ private struct BuildContext {
     var assocLinks: [AssocLink] = []
     var assocStubs: [AssocStub] = []
 
-    init(from person: PersonData, sourID: String,
+    // Claude AI source ID (set when person has LLM enrichment data)
+    var llmSourID: String? = nil
+
+    init(from person: PersonData, sourID: String, llmSourID: String?,
          personRegistry: inout [String: String],
          familyRegistry: inout [String: String],
          nextI: inout Int, nextF: inout Int, nextO: inout Int) {
@@ -66,7 +70,8 @@ private struct BuildContext {
         self.mainIndiID = personRegistry[person.wikiTitle ?? ""]
                        ?? personRegistry[person.name ?? ""]
                        ?? { let id = "@I\(nextI)@"; nextI += 1; return id }()
-        self.sourID = sourID
+        self.sourID    = sourID
+        self.llmSourID = llmSourID
 
         // Register a newly-allocated stub ID in the shared personRegistry so that
         // subsequent BuildContext instances deduplicate against it.
@@ -170,8 +175,26 @@ private struct BuildContext {
                 assocLinks.append(AssocLink(
                     indiID: indiID,
                     rela:   pair.rela,
-                    note:   pos.title.isEmpty ? nil : "as \(pos.title)"))
+                    note:   pos.title.isEmpty ? nil : "as \(pos.title)",
+                    sourID: sourID))
             }
+        }
+
+        // LLM-identified influential people → ASSO (cited against Claude source)
+        let llmID = llmSourID ?? sourID
+        for ip in person.influentialPeople {
+            guard !ip.name.isEmpty else { continue }
+            let (indiID, known) = resolve(wikiTitle: ip.wikiTitle, name: ip.name)
+            if !known {
+                assocStubs.append(AssocStub(indiID: indiID, name: ip.name))
+            }
+            let note = [ip.note, "Identified by Claude AI analysis."]
+                .compactMap { $0 }.joined(separator: " ")
+            assocLinks.append(AssocLink(
+                indiID: indiID,
+                rela:   ip.relationship,
+                note:   note.isEmpty ? nil : note,
+                sourID: llmID))
         }
 
         // Multimedia — portrait
@@ -206,6 +229,14 @@ public struct GEDCOMBuilder {
             if sourIDs[base] == nil { sourIDs[base] = "@S\(nextS)@"; nextS += 1 }
         }
 
+        // Allocate a Claude AI source record if any person has LLM enrichment
+        let hasLLM = persons.contains {
+            !$0.llmAlternateNames.isEmpty || !$0.llmTitles.isEmpty ||
+            !$0.llmFacts.isEmpty || !$0.llmEvents.isEmpty || !$0.influentialPeople.isEmpty
+        }
+        let llmSourID: String? = hasLLM ? "@S\(nextS)@" : nil
+        if hasLLM { nextS += 1 }
+
         // ── Pre-allocate main INDI IDs for all persons ─────────────────────────
         // Build personRegistry before constructing contexts so cross-references
         // between persons in the list resolve to the correct pre-allocated IDs.
@@ -226,7 +257,7 @@ public struct GEDCOMBuilder {
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             let sID  = sourIDs[base] ?? "@S1@"
-            contexts.append(BuildContext(from: person, sourID: sID,
+            contexts.append(BuildContext(from: person, sourID: sID, llmSourID: llmSourID,
                                           personRegistry: &personRegistry,
                                           familyRegistry: &familyRegistry,
                                           nextI: &nextI, nextF: &nextF, nextO: &nextO))
@@ -249,8 +280,11 @@ public struct GEDCOMBuilder {
             writeSource(baseURL: base, sourID: sID)
         }
 
+        // Claude AI source record (only when LLM enrichment was used)
+        if let llmID = llmSourID { writeLLMSource(sourID: llmID) }
+
         for (person, ctx) in zip(persons, contexts) {
-            if let oid = ctx.objeID { writeMultimedia(person: person, objeID: oid) }
+            if let oid = ctx.objeID { writeMultimedia(person: person, objeID: oid, sourID: ctx.sourID) }
             writeAdditionalMedia(person: person, ctx: ctx)
         }
 
@@ -397,12 +431,51 @@ public struct GEDCOMBuilder {
         if let n = person.nationality { line(1, "NATI \(n)") }
         if let r = person.religion    { line(1, "RELI \(r)") }
 
-        // Associations — predecessor/successor as influential persons (ASSO)
+        // Associations — predecessor/successor + LLM influential persons (ASSO)
         for asso in ctx.assocLinks {
             line(1, "ASSO \(asso.indiID)")
             line(2, "RELA \(asso.rela)")
             if let n = asso.note { line(2, "NOTE \(n)") }
-            line(2, "SOUR \(ctx.sourID)")
+            line(2, "SOUR \(asso.sourID)")
+        }
+
+        // ── LLM-sourced enrichment (cited against Claude AI source) ───────────
+        if let llmID = ctx.llmSourID {
+            let llmNote = "Extracted by Claude AI (Anthropic) from Wikipedia article text."
+
+            // Alternate names identified by LLM
+            for alt in person.llmAlternateNames {
+                line(1, "NAME \(alt)")
+                line(2, "TYPE aka")
+                line(2, "NOTE \(llmNote)")
+                line(2, "SOUR \(llmID)")
+            }
+
+            // Additional titles / honorifics identified by LLM
+            for title in person.llmTitles {
+                line(1, "TITL \(title)")
+                line(2, "NOTE \(llmNote)")
+                line(2, "SOUR \(llmID)")
+            }
+
+            // Additional facts identified by LLM
+            for fact in person.llmFacts {
+                line(1, "FACT \(fact.value)")
+                line(2, "TYPE \(fact.type)")
+                line(2, "NOTE \(llmNote)")
+                line(2, "SOUR \(llmID)")
+            }
+
+            // Additional events identified by LLM
+            for evt in person.llmEvents {
+                line(1, "EVEN")
+                line(2, "TYPE \(evt.type)")
+                if let d = evt.date, !d.isEmpty { line(2, "DATE \(d.gedcom)") }
+                if let p = evt.place            { line(2, "PLAC \(p)") }
+                let evtNote = [evt.note, llmNote].compactMap { $0 }.joined(separator: " ")
+                line(2, "NOTE \(evtNote)")
+                line(2, "SOUR \(llmID)")
+            }
         }
 
         // Wikipedia article sections — one NOTE per section (--notes)
@@ -600,9 +673,22 @@ public struct GEDCOMBuilder {
         line(1, "DATE \(df.string(from: Date()).uppercased())")
     }
 
+    // MARK: SOUR — Claude AI (LLM enrichment)
+
+    private mutating func writeLLMSource(sourID: String) {
+        line(0, "\(sourID) SOUR")
+        line(1, "TITL Claude AI (Anthropic)")
+        line(1, "AUTH Anthropic, PBC")
+        line(1, "PUBL Anthropic, PBC")
+        line(1, "WWW https://anthropic.com")
+        line(1, "NOTE Data in records citing this source was extracted by Claude AI " +
+                "large language model analysis of Wikipedia article text and should " +
+                "be independently verified.")
+    }
+
     // MARK: OBJE
 
-    private mutating func writeMultimedia(person: PersonData, objeID: String) {
+    private mutating func writeMultimedia(person: PersonData, objeID: String, sourID: String) {
         guard let filePath = person.imageFilePath ?? person.imageURL else { return }
 
         let ref = person.imageMimeType ?? person.imageURL ?? filePath
@@ -618,6 +704,8 @@ public struct GEDCOMBuilder {
         line(1, "FILE \(filePath)")
         line(2, "FORM \(format)")
         if let t = person.wikiTitle { line(2, "TITL Portrait of \(t)") }
+        line(1, "SOUR \(sourID)")
+        if let url = person.wikiURL { line(2, "PAGE \(url)") }
     }
 
     // MARK: Additional OBJE records (--allimages)
@@ -638,6 +726,8 @@ public struct GEDCOMBuilder {
             line(1, "FILE \(media.filePath)")
             line(2, "FORM \(format)")
             if let t = media.title { line(2, "TITL \(t)") }
+            line(1, "SOUR \(ctx.sourID)")
+            if let url = person.wikiURL { line(2, "PAGE \(url)") }
         }
     }
 

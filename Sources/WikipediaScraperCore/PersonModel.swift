@@ -83,6 +83,17 @@ public struct PersonFact {
     public init(type: String, value: String) { self.type = type; self.value = value }
 }
 
+// A historically influential person identified by LLM analysis (maps to GEDCOM ASSO + RELA)
+public struct InfluentialPerson {
+    public var name:         String
+    public var wikiTitle:    String?
+    public var relationship: String   // e.g. "Mentor", "Rival", "Patron"
+    public var note:         String?  // one sentence of context
+    public init(name: String, wikiTitle: String? = nil, relationship: String, note: String? = nil) {
+        self.name = name; self.wikiTitle = wikiTitle; self.relationship = relationship; self.note = note
+    }
+}
+
 // MARK: - PersonRef
 
 public struct PersonRef {
@@ -173,6 +184,14 @@ public struct PersonData {
 
     // ── Wikipedia article sections (--notes) ──────────────────────────────
     public var wikiSections: [(title: String, text: String)] = []
+
+    // ── LLM-sourced enrichment (--llm) ────────────────────────────────────
+    // Kept separate from infobox-parsed data so GEDCOM can cite Claude as source.
+    public var llmAlternateNames:  [String]            = []
+    public var llmTitles:          [String]             = []
+    public var llmFacts:           [PersonFact]         = []
+    public var llmEvents:          [CustomEvent]        = []
+    public var influentialPeople:  [InfluentialPerson]  = []
 }
 
 // A single additional media file (portrait or article image)
