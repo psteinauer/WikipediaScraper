@@ -3,9 +3,10 @@ APP_BINARY    = WikipediaScraperApp
 APP_BUNDLE    = WikipediaScraper.app
 IPAD_BINARY   = WikipediaScraperIPad
 IPAD_SCHEME   = WikipediaScraperIPad
+IPAD_PROJECT  = WikipediaScraperIPad.xcodeproj
 INSTALL_PREFIX ?= /usr/local/bin
 
-.PHONY: build release install app app-release ipad ipad-sim icons clean xcode test
+.PHONY: build release install app app-release ipad ipad-sim icons clean xcode xcode-ipad test
 
 ## Build debug binaries
 build:
@@ -55,11 +56,13 @@ app-release:
 ipad-sim:
 	@echo "→ Building $(IPAD_SCHEME) for iPad simulator…"
 	xcrun xcodebuild \
+	    -project "$(IPAD_PROJECT)" \
 	    -scheme "$(IPAD_SCHEME)" \
 	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M5)" \
 	    -configuration Debug \
 	    build | xcpretty 2>/dev/null || \
 	xcrun xcodebuild \
+	    -project "$(IPAD_PROJECT)" \
 	    -scheme "$(IPAD_SCHEME)" \
 	    -destination "platform=iOS Simulator,name=iPad Pro 13-inch (M5)" \
 	    -configuration Debug \
@@ -69,6 +72,7 @@ ipad-sim:
 ipad:
 	@echo "→ Building $(IPAD_SCHEME) release for iOS…"
 	xcrun xcodebuild \
+	    -project "$(IPAD_PROJECT)" \
 	    -scheme "$(IPAD_SCHEME)" \
 	    -destination "generic/platform=iOS" \
 	    -configuration Release \
@@ -78,9 +82,13 @@ ipad:
 icons:
 	swift make_icon.swift
 
-## Open the package in Xcode
+## Open the SPM package in Xcode (macOS targets)
 xcode:
 	xed .
+
+## Open the iPad Xcode project in Xcode
+xcode-ipad:
+	open "$(IPAD_PROJECT)"
 
 ## Remove build artefacts and any built .app
 clean:

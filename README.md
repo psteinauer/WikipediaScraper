@@ -57,19 +57,19 @@ The **Media** section shows a live thumbnail for every image URL. Use **Add Medi
 
 ### Installation
 
-Open the package in Xcode (`make xcode`) and run the `WikipediaScraperIPad` scheme on an iPad or iPad simulator.
+Open the dedicated Xcode project and run the `WikipediaScraperIPad` scheme on an iPad or iPad simulator.
 
 To build for a connected iPad device:
 
 ```bash
-make xcode       # open Package.swift in Xcode
+make xcode-ipad  # open WikipediaScraperIPad.xcodeproj in Xcode
 # Select the WikipediaScraperIPad scheme → your iPad → Run
 ```
 
 To build in the simulator from the command line (requires Xcode):
 
 ```bash
-make ipad-sim    # builds for iPad Pro 13-inch (M4) simulator
+make ipad-sim    # builds for iPad Pro 13-inch (M5) simulator
 ```
 
 ### How to use it
@@ -325,8 +325,9 @@ Use `--nopeople` (CLI) to include only the explicitly-specified URLs. Referenced
 | `make app` | Release macOS `.app` bundle → `WikipediaScraper.app` |
 | `make install` | Build release CLI and install to `/usr/local/bin` |
 | `make install INSTALL_PREFIX=<dir>` | Install CLI to custom directory |
-| `make ipad-sim` | Build iPadOS app for iPad simulator (requires Xcode) |
+| `make ipad-sim` | Build iPadOS app for iPad Pro 13-inch (M5) simulator (requires Xcode) |
 | `make ipad` | Build iPadOS app release for device (requires Xcode) |
+| `make xcode-ipad` | Open `WikipediaScraperIPad.xcodeproj` in Xcode |
 | `make icons` | Regenerate all app icon PNGs (macOS + iPadOS) |
 | `make xcode` | Open package in Xcode |
 | `make clean` | Remove build artefacts and `WikipediaScraper.app` |
@@ -370,6 +371,7 @@ Sources/
     └── Assets.xcassets/           iPad app icon (9 PNG sizes)
 
 make_icon.swift                    Icon generator — regenerates macOS + iPadOS PNGs
+WikipediaScraperIPad.xcodeproj/    Xcode project for the iPadOS app (iOS Application target)
 ```
 
 ---
