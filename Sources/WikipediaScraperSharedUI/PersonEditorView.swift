@@ -556,15 +556,13 @@ private struct MediaGrid: View {
 
 // MARK: - PersonEditorView
 
-private struct NameCardHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 public struct PersonEditorView: View {
     @Binding public var person: EditablePerson
 
-    @State private var nameCardHeight: CGFloat = 0
+    /// Tracks the rendered height of the Name and Gender card so the
+    /// primary-image thumbnail can match it.  Starts at a reasonable
+    /// default so the image is visible on the very first render.
+    @State private var nameCardHeight: CGFloat = 160
 
     private static let topLevelSections = [
         "Name and Gender", "Events", "Facts", "Additional Names",
@@ -616,18 +614,18 @@ public struct PersonEditorView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     nameAndGenderSection
-                        .background {
+                        .overlay {
                             GeometryReader { geo in
-                                Color.clear.preference(key: NameCardHeightKey.self,
-                                                       value: geo.size.height)
+                                Color.clear.onAppear {
+                                    nameCardHeight = geo.size.height
+                                }
                             }
                         }
-                    if !person.imageURL.isEmpty && nameCardHeight > 0
+                    if !person.imageURL.isEmpty
                         && expandedSections.contains("Name and Gender") {
                         MediaThumbnail(urlString: person.imageURL, height: nameCardHeight)
                     }
                 }
-                .onPreferenceChange(NameCardHeightKey.self) { nameCardHeight = $0 }
                 eventsSection
                 factsSection
                 additionalNamesSection
