@@ -569,16 +569,7 @@ public struct PersonEditorView: View {
         "Media", "Notes", "Sources", "Other"
     ]
 
-    @State private var expandedSections: Set<String> = {
-        var s = Set(PersonEditorView.topLevelSections)
-        s.formUnion([
-            "Events.Birth", "Events.Death", "Events.Burial", "Events.Baptism",
-            "Events.Spouses", "Events.TitledPositions", "Events.CustomEvents",
-            "Facts.Honorifics", "Facts.Custom", "Facts.Occupations", "Facts.Attributes",
-            "Other.Parents", "Other.Children",
-        ])
-        return s
-    }()
+    @State private var expandedSections: Set<String> = ["Name and Gender"]
 
     public init(person: Binding<EditablePerson>) {
         self._person = person
