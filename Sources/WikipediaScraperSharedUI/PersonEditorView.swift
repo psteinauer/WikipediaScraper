@@ -878,13 +878,9 @@ public struct PersonEditorView: View {
                         .padding(.vertical, 2)
                     }
                 } label: {
-                    Label("AI Analysis", systemImage: "wand.and.stars")
+                    Label("AI Generated", systemImage: "wand.and.stars")
                         .font(.headline)
                 }
-            } header: {
-                Text("Claude AI (Anthropic)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }

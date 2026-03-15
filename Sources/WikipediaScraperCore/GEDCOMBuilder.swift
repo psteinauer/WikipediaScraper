@@ -257,7 +257,13 @@ public struct GEDCOMBuilder {
         for person in persons {
             let base = baseURL(from: person.wikiURL ?? "")
             let sID  = sourIDs[base] ?? "@S1@"
-            contexts.append(BuildContext(from: person, sourID: sID, llmSourID: llmSourID,
+            // Only give a person the LLM source ID when that specific person has LLM data;
+            // persons fetched without --llm must not cite Claude AI as a source.
+            let personHasLLM = !person.llmAlternateNames.isEmpty || !person.llmTitles.isEmpty
+                || !person.llmFacts.isEmpty || !person.llmEvents.isEmpty
+                || !person.influentialPeople.isEmpty
+            contexts.append(BuildContext(from: person, sourID: sID,
+                                          llmSourID: personHasLLM ? llmSourID : nil,
                                           personRegistry: &personRegistry,
                                           familyRegistry: &familyRegistry,
                                           nextI: &nextI, nextF: &nextF, nextO: &nextO))
