@@ -13,6 +13,46 @@ private var separatorColor: Color    { Color(UIColor.separator) }
 private var thumbnailBGColor: Color  { Color(UIColor.secondarySystemBackground) }
 #endif
 
+// MARK: - FieldRow
+//
+// MacFamilyTree-style two-column field row: right-aligned label at a fixed
+// width, content fills the remainder.  An optional inset divider separates
+// rows; pass showDivider: false on the last row in a group.
+
+private let editorLabelWidth: CGFloat = 120
+
+private struct FieldRow<Content: View>: View {
+    let label: String
+    let showDivider: Bool
+    let content: Content
+
+    init(_ label: String, showDivider: Bool = true,
+         @ViewBuilder content: () -> Content) {
+        self.label       = label
+        self.showDivider = showDivider
+        self.content     = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(width: editorLabelWidth, alignment: .trailing)
+                content
+                    .textFieldStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 7)
+            if showDivider {
+                Divider()
+                    .padding(.leading, editorLabelWidth + 10)
+            }
+        }
+    }
+}
+
 // MARK: - EventSectionContent
 
 public struct EventSectionContent: View {
@@ -20,17 +60,19 @@ public struct EventSectionContent: View {
     public var showCause: Bool = false
 
     public init(event: Binding<EditableEvent>, showCause: Bool = false) {
-        self._event = event
+        self._event    = event
         self.showCause = showCause
     }
 
     public var body: some View {
-        LabeledContent("Date")  { TextField("e.g. 24 MAY 1819", text: $event.date) }
-        LabeledContent("Place") { TextField("City, Country", text: $event.place) }
+        FieldRow("Date")  { TextField("e.g. 24 MAY 1819", text: $event.date) }
+        FieldRow("Place") { TextField("City, Country",    text: $event.place) }
         if showCause {
-            LabeledContent("Cause") { TextField("Cause of death", text: $event.cause) }
+            FieldRow("Cause") { TextField("Cause of death", text: $event.cause) }
         }
-        LabeledContent("Note")  { TextField("Additional note", text: $event.note) }
+        FieldRow("Note", showDivider: false) {
+            TextField("Additional note", text: $event.note)
+        }
     }
 }
 
@@ -334,49 +376,124 @@ private struct MediaGridCell: View {
     }
 }
 
+// MARK: - EditorSection
+//
+// MacFamilyTree-style card: coloured SF Symbol + bold title header with a
+// disclosure chevron.  When expanded, shows content inside a white (or dark)
+// rounded-rectangle card with a subtle shadow and 0.5 pt border.
+
+private struct EditorSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @Binding var isExpanded: Bool
+    let content: Content
+
+    init(_ title: String, systemImage: String,
+         isExpanded: Binding<Bool>,
+         @ViewBuilder content: () -> Content) {
+        self.title       = title
+        self.systemImage = systemImage
+        self._isExpanded = isExpanded
+        self.content     = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            Button { isExpanded.toggle() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(Color.accentColor)
+                        .imageScale(.small)
+                        .frame(width: 20, alignment: .center)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.18), value: isExpanded)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+
+            if isExpanded {
+                Divider()
+                content
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .transition(.opacity)
+            }
+        }
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.07), radius: 3, x: 0, y: 1)
+    }
+
+    #if os(macOS)
+    private var cardBackground: Color { Color(NSColor.controlBackgroundColor) }
+    #else
+    private var cardBackground: Color { Color(UIColor.secondarySystemGroupedBackground) }
+    #endif
+}
+
 // MARK: - SubGroup
 //
-// A collapsible second-level grouping for use inside a top-level Section.
-// Renders as a single Form row so the header + all content share one row
-// background; the header is indented ~10 pt relative to the section header
-// and the content is indented a further 16 pt relative to the sub-header.
+// Second-level collapsible group inside an EditorSection.
+// The header sits flush with the section content; content is indented 18 pt.
 
 private struct SubGroup<Content: View>: View {
     let title: String
     let systemImage: String
     @Binding var isExpanded: Bool
-    @ViewBuilder let content: () -> Content
+    let content: Content
+
+    init(title: String, systemImage: String,
+         isExpanded: Binding<Bool>,
+         @ViewBuilder content: () -> Content) {
+        self.title       = title
+        self.systemImage = systemImage
+        self._isExpanded = isExpanded
+        self.content     = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Sub-group header button
             Button { isExpanded.toggle() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .animation(.easeInOut(duration: 0.15), value: isExpanded)
                         .frame(width: 10)
                     Label(title, systemImage: systemImage)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
+            .padding(.vertical, 7)
 
-            // Indented content
             if isExpanded {
-                content()
-                    .padding(.leading, 16)
-                    .padding(.top, 6)
-                    .padding(.bottom, 4)
+                content
+                    .padding(.leading, 18)
+                    .padding(.bottom, 6)
+                    .transition(.opacity)
             }
         }
-        .padding(.leading, 10)
-        .padding(.vertical, 2)
     }
 }
 
@@ -443,7 +560,7 @@ public struct PersonEditorView: View {
         Binding(
             get: { expandedSections.contains(section) },
             set: { newValue in
-                withAnimation(.easeInOut(duration: 0.15)) {
+                withAnimation(.easeInOut(duration: 0.2)) {
                     #if os(macOS)
                     let optionDown = NSEvent.modifierFlags.contains(.option)
                     #else
@@ -465,53 +582,57 @@ public struct PersonEditorView: View {
     }
 
     public var body: some View {
-        Form {
-            nameAndGenderSection
-            eventsSection
-            factsSection
-            additionalNamesSection
-            mediaSection
-            notesSection
-            sourcesSection
-            otherSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                nameAndGenderSection
+                eventsSection
+                factsSection
+                additionalNamesSection
+                mediaSection
+                notesSection
+                sourcesSection
+                otherSection
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .formStyle(.grouped)
     }
 
     // MARK: - AI Generated label
 
     private var aiGeneratedLabel: some View {
-        Label("AI Generated", systemImage: "wand.and.stars")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.top, 4)
+        HStack(spacing: 5) {
+            Image(systemName: "wand.and.stars").imageScale(.small)
+            Text("AI Generated")
+        }
+        .font(.caption)
+        .fontWeight(.medium)
+        .foregroundStyle(.secondary)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
     }
 
     // MARK: - Name and Gender
 
     private var nameAndGenderSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Name and Gender")) {
-                LabeledContent("Wikipedia Title") {
-                    Text(person.wikiTitle.isEmpty ? "—" : person.wikiTitle)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+        EditorSection("Name and Gender", systemImage: "person.text.rectangle",
+                      isExpanded: isExpanded("Name and Gender")) {
+            FieldRow("Wikipedia Title") {
+                Text(person.wikiTitle.isEmpty ? "—" : person.wikiTitle)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            FieldRow("Given Name") { TextField("Given name(s)", text: $person.givenName) }
+            FieldRow("Surname")    { TextField("Family name",   text: $person.surname) }
+            FieldRow("Sex", showDivider: false) {
+                Picker("", selection: $person.sex) {
+                    Text("Unknown").tag(Sex.unknown)
+                    Text("Male").tag(Sex.male)
+                    Text("Female").tag(Sex.female)
                 }
-                LabeledContent("Given Name") { TextField("Given name(s)", text: $person.givenName) }
-                LabeledContent("Surname")    { TextField("Family name",   text: $person.surname) }
-                LabeledContent("Sex") {
-                    Picker("", selection: $person.sex) {
-                        Text("Unknown").tag(Sex.unknown)
-                        Text("Male").tag(Sex.male)
-                        Text("Female").tag(Sex.female)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(maxWidth: 240)
-                }
-            } label: {
-                Label("Name and Gender", systemImage: "person.text.rectangle")
-                    .font(.headline)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 240)
             }
         }
     }
@@ -519,147 +640,125 @@ public struct PersonEditorView: View {
     // MARK: - Events
 
     private var eventsSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Events")) {
-                SubGroup(title: "Birth", systemImage: "calendar",
-                         isExpanded: isExpanded("Events.Birth")) {
-                    EventSectionContent(event: $person.birth)
-                }
-
-                SubGroup(title: "Death", systemImage: "leaf",
-                         isExpanded: isExpanded("Events.Death")) {
-                    EventSectionContent(event: $person.death, showCause: true)
-                }
-
-                SubGroup(title: "Burial", systemImage: "mappin",
-                         isExpanded: isExpanded("Events.Burial")) {
-                    EventSectionContent(event: $person.burial)
-                }
-
-                SubGroup(title: "Baptism", systemImage: "drop.fill",
-                         isExpanded: isExpanded("Events.Baptism")) {
-                    EventSectionContent(event: $person.baptism)
-                }
-
-                SubGroup(title: "Spouses", systemImage: "person.2",
-                         isExpanded: isExpanded("Events.Spouses")) {
-                    ForEach($person.spouses) { $spouse in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top, spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    LabeledContent("Name")     { TextField("Spouse's full name", text: $spouse.name) }
-                                    LabeledContent("Married")  { TextField("Marriage date", text: $spouse.marriageDate) }
-                                    LabeledContent("At")       { TextField("Marriage place", text: $spouse.marriagePlace) }
-                                    LabeledContent("Divorced") { TextField("Divorce date (if applicable)", text: $spouse.divorceDate) }
-                                }
-                                Button {
-                                    person.spouses.removeAll { $0.id == spouse.id }
-                                } label: {
-                                    Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                            Divider()
+        EditorSection("Events", systemImage: "calendar.badge.clock",
+                      isExpanded: isExpanded("Events")) {
+            SubGroup(title: "Birth", systemImage: "calendar",
+                     isExpanded: isExpanded("Events.Birth")) {
+                EventSectionContent(event: $person.birth)
+            }
+            Divider()
+            SubGroup(title: "Death", systemImage: "leaf",
+                     isExpanded: isExpanded("Events.Death")) {
+                EventSectionContent(event: $person.death, showCause: true)
+            }
+            Divider()
+            SubGroup(title: "Burial", systemImage: "mappin",
+                     isExpanded: isExpanded("Events.Burial")) {
+                EventSectionContent(event: $person.burial)
+            }
+            Divider()
+            SubGroup(title: "Baptism", systemImage: "drop.fill",
+                     isExpanded: isExpanded("Events.Baptism")) {
+                EventSectionContent(event: $person.baptism)
+            }
+            Divider()
+            SubGroup(title: "Spouses", systemImage: "person.2",
+                     isExpanded: isExpanded("Events.Spouses")) {
+                ForEach($person.spouses) { $spouse in
+                    FieldRow("Name")    { TextField("Spouse's full name",            text: $spouse.name) }
+                    FieldRow("Married") { TextField("Marriage date",                 text: $spouse.marriageDate) }
+                    FieldRow("At")      { TextField("Marriage place",                text: $spouse.marriagePlace) }
+                    FieldRow("Divorced") { TextField("Divorce date (if applicable)", text: $spouse.divorceDate) }
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            person.spouses.removeAll { $0.id == spouse.id }
+                        } label: {
+                            Label("Remove", systemImage: "minus.circle")
+                                .font(.caption).foregroundStyle(.red)
                         }
+                        .buttonStyle(.borderless)
                     }
-                    Button {
-                        person.spouses.append(EditableSpouse())
-                    } label: {
-                        Label("Add Spouse", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
+                    .padding(.bottom, 4)
+                    Divider()
                 }
-
-                SubGroup(title: "Titled Positions", systemImage: "crown",
-                         isExpanded: isExpanded("Events.TitledPositions")) {
-                    ForEach($person.titledPositions) { $pos in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top, spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    LabeledContent("Title")        { TextField("e.g. Queen of the United Kingdom", text: $pos.title) }
-                                    LabeledContent("From")         { TextField("Start date", text: $pos.startDate) }
-                                    LabeledContent("To")           { TextField("End date", text: $pos.endDate) }
-                                    LabeledContent("Place")        { TextField("Place", text: $pos.place) }
-                                    LabeledContent("Preceded by")  { TextField("Predecessor's name", text: $pos.predecessor) }
-                                    LabeledContent("Succeeded by") { TextField("Successor's name", text: $pos.successor) }
-                                    LabeledContent("Note")         { TextField("Note", text: $pos.note) }
-                                }
-                                Button {
-                                    person.titledPositions.removeAll { $0.id == pos.id }
-                                } label: {
-                                    Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                            Divider()
+                Button { person.spouses.append(EditableSpouse()) } label: {
+                    Label("Add Spouse", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+            }
+            Divider()
+            SubGroup(title: "Titled Positions", systemImage: "crown",
+                     isExpanded: isExpanded("Events.TitledPositions")) {
+                ForEach($person.titledPositions) { $pos in
+                    FieldRow("Title")        { TextField("e.g. Queen of the United Kingdom", text: $pos.title) }
+                    FieldRow("From")         { TextField("Start date",         text: $pos.startDate) }
+                    FieldRow("To")           { TextField("End date",           text: $pos.endDate) }
+                    FieldRow("Place")        { TextField("Place",              text: $pos.place) }
+                    FieldRow("Preceded by")  { TextField("Predecessor's name", text: $pos.predecessor) }
+                    FieldRow("Succeeded by") { TextField("Successor's name",   text: $pos.successor) }
+                    FieldRow("Note")         { TextField("Note",               text: $pos.note) }
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            person.titledPositions.removeAll { $0.id == pos.id }
+                        } label: {
+                            Label("Remove", systemImage: "minus.circle")
+                                .font(.caption).foregroundStyle(.red)
                         }
+                        .buttonStyle(.borderless)
                     }
-                    Button {
-                        person.titledPositions.append(EditableTitledPosition())
-                    } label: {
-                        Label("Add Position", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
+                    .padding(.bottom, 4)
+                    Divider()
                 }
-
-                SubGroup(title: "Custom Events", systemImage: "calendar.badge.clock",
-                         isExpanded: isExpanded("Events.CustomEvents")) {
-                    ForEach($person.customEvents) { $event in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top, spacing: 8) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    LabeledContent("Event Type") { TextField("e.g. Coronation, Inauguration", text: $event.type) }
-                                    LabeledContent("Date")       { TextField("e.g. 28 JUN 1838", text: $event.date) }
-                                    LabeledContent("Place")      { TextField("Place", text: $event.place) }
-                                    LabeledContent("Note")       { TextField("Note", text: $event.note) }
-                                }
-                                Button {
-                                    person.customEvents.removeAll { $0.id == event.id }
-                                } label: {
-                                    Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                            Divider()
+                Button { person.titledPositions.append(EditableTitledPosition()) } label: {
+                    Label("Add Position", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+            }
+            Divider()
+            SubGroup(title: "Custom Events", systemImage: "calendar.badge.clock",
+                     isExpanded: isExpanded("Events.CustomEvents")) {
+                ForEach($person.customEvents) { $event in
+                    FieldRow("Event Type") { TextField("e.g. Coronation, Inauguration", text: $event.type) }
+                    FieldRow("Date")       { TextField("e.g. 28 JUN 1838",             text: $event.date) }
+                    FieldRow("Place")      { TextField("Place",                         text: $event.place) }
+                    FieldRow("Note")       { TextField("Note",                          text: $event.note) }
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            person.customEvents.removeAll { $0.id == event.id }
+                        } label: {
+                            Label("Remove", systemImage: "minus.circle")
+                                .font(.caption).foregroundStyle(.red)
                         }
+                        .buttonStyle(.borderless)
                     }
-                    Button {
-                        person.customEvents.append(EditableCustomEvent())
-                    } label: {
-                        Label("Add Event", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
+                    .padding(.bottom, 4)
+                    Divider()
                 }
-
-                if !person.llmEvents.isEmpty {
-                    aiGeneratedLabel
-                        .padding(.leading, 10)
-                    ForEach(person.llmEvents, id: \.type) { event in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.type).fontWeight(.medium)
-                            if let date = event.date {
-                                Text(date.gedcom)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let place = event.place {
-                                Text(place)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let note = event.note {
-                                Text(note)
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                        .padding(.leading, 26)
-                    }
+                Button { person.customEvents.append(EditableCustomEvent()) } label: {
+                    Label("Add Event", systemImage: "plus.circle")
                 }
-            } label: {
-                Label("Events", systemImage: "calendar.badge.clock")
-                    .font(.headline)
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+            }
+            if !person.llmEvents.isEmpty {
+                Divider()
+                aiGeneratedLabel
+                ForEach(person.llmEvents, id: \.type) { event in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(event.type).fontWeight(.medium).font(.subheadline)
+                        if let date  = event.date  { Text(date.gedcom).font(.caption).foregroundStyle(.secondary) }
+                        if let place = event.place { Text(place).font(.caption).foregroundStyle(.secondary) }
+                        if let note  = event.note  { Text(note).font(.caption).foregroundStyle(.tertiary) }
+                    }
+                    .padding(.vertical, 5)
+                    .padding(.leading, 22)
+                    Divider().padding(.leading, 22)
+                }
             }
         }
     }
@@ -667,100 +766,98 @@ public struct PersonEditorView: View {
     // MARK: - Facts
 
     private var factsSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Facts")) {
-                SubGroup(title: "Honorifics & Titles", systemImage: "textformat",
-                         isExpanded: isExpanded("Facts.Honorifics")) {
-                    ForEach(person.honorifics.indices, id: \.self) { index in
-                        HStack {
-                            TextField("e.g. Sir, The Right Honourable", text: $person.honorifics[index])
-                            Button {
-                                person.honorifics.remove(at: index)
-                            } label: {
-                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                            }
-                            .buttonStyle(.borderless)
+        EditorSection("Facts", systemImage: "list.bullet",
+                      isExpanded: isExpanded("Facts")) {
+            SubGroup(title: "Honorifics & Titles", systemImage: "textformat",
+                     isExpanded: isExpanded("Facts.Honorifics")) {
+                ForEach(person.honorifics.indices, id: \.self) { index in
+                    HStack {
+                        TextField("e.g. Sir, The Right Honourable",
+                                  text: $person.honorifics[index])
+                            .textFieldStyle(.plain)
+                        Button { person.honorifics.remove(at: index) } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
                         }
+                        .buttonStyle(.borderless)
                     }
-                    Button {
-                        person.honorifics.append("")
-                    } label: {
-                        Label("Add Honorific", systemImage: "plus.circle")
+                    .padding(.vertical, 5)
+                    Divider()
+                }
+                Button { person.honorifics.append("") } label: {
+                    Label("Add Honorific", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+                if !person.llmTitles.isEmpty {
+                    Divider()
+                    aiGeneratedLabel
+                    FieldRow("Additional Titles", showDivider: false) {
+                        Text(person.llmTitles.joined(separator: ", "))
+                            .foregroundStyle(.secondary).textSelection(.enabled)
                     }
-                    .buttonStyle(.borderless)
-                    if !person.llmTitles.isEmpty {
-                        aiGeneratedLabel
-                        LabeledContent("Additional Titles") {
-                            Text(person.llmTitles.joined(separator: ", "))
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
+                }
+            }
+            Divider()
+            SubGroup(title: "Custom Facts", systemImage: "list.bullet",
+                     isExpanded: isExpanded("Facts.Custom")) {
+                ForEach($person.personFacts) { $fact in
+                    HStack(spacing: 8) {
+                        TextField("Type (e.g. House, Award)", text: $fact.type)
+                            .textFieldStyle(.plain).frame(maxWidth: 160)
+                        Text("·").foregroundStyle(.tertiary)
+                        TextField("Value", text: $fact.value).textFieldStyle(.plain)
+                        Button { person.personFacts.removeAll { $0.id == fact.id } } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 5)
+                    Divider()
+                }
+                Button { person.personFacts.append(EditablePersonFact()) } label: {
+                    Label("Add Fact", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+                if !person.llmFacts.isEmpty {
+                    Divider()
+                    aiGeneratedLabel
+                    ForEach(person.llmFacts, id: \.type) { fact in
+                        FieldRow(fact.type, showDivider: false) {
+                            Text(fact.value).foregroundStyle(.secondary).textSelection(.enabled)
                         }
                     }
                 }
-
-                SubGroup(title: "Custom Facts", systemImage: "list.bullet",
-                         isExpanded: isExpanded("Facts.Custom")) {
-                    ForEach($person.personFacts) { $fact in
-                        HStack(spacing: 8) {
-                            TextField("Fact type (e.g. House, Award)", text: $fact.type)
-                                .frame(maxWidth: 200)
-                            Divider().frame(height: 18)
-                            TextField("Value", text: $fact.value)
-                            Button {
-                                person.personFacts.removeAll { $0.id == fact.id }
-                            } label: {
-                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                            }
-                            .buttonStyle(.borderless)
+            }
+            Divider()
+            SubGroup(title: "Occupations", systemImage: "briefcase",
+                     isExpanded: isExpanded("Facts.Occupations")) {
+                ForEach(person.occupations.indices, id: \.self) { index in
+                    HStack {
+                        TextField("e.g. Monarch, Statesman",
+                                  text: $person.occupations[index])
+                            .textFieldStyle(.plain)
+                        Button { person.occupations.remove(at: index) } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
                         }
+                        .buttonStyle(.borderless)
                     }
-                    Button {
-                        person.personFacts.append(EditablePersonFact())
-                    } label: {
-                        Label("Add Fact", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
-                    if !person.llmFacts.isEmpty {
-                        aiGeneratedLabel
-                        ForEach(person.llmFacts, id: \.type) { fact in
-                            LabeledContent(fact.type) {
-                                Text(fact.value)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                            }
-                        }
-                    }
+                    .padding(.vertical, 5)
+                    Divider()
                 }
-
-                SubGroup(title: "Occupations", systemImage: "briefcase",
-                         isExpanded: isExpanded("Facts.Occupations")) {
-                    ForEach(person.occupations.indices, id: \.self) { index in
-                        HStack {
-                            TextField("e.g. Monarch, Statesman", text: $person.occupations[index])
-                            Button {
-                                person.occupations.remove(at: index)
-                            } label: {
-                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                    Button {
-                        person.occupations.append("")
-                    } label: {
-                        Label("Add Occupation", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
+                Button { person.occupations.append("") } label: {
+                    Label("Add Occupation", systemImage: "plus.circle")
                 }
-
-                SubGroup(title: "Attributes", systemImage: "tag",
-                         isExpanded: isExpanded("Facts.Attributes")) {
-                    LabeledContent("Nationality") { TextField("e.g. British", text: $person.nationality) }
-                    LabeledContent("Religion")    { TextField("e.g. Church of England", text: $person.religion) }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+            }
+            Divider()
+            SubGroup(title: "Attributes", systemImage: "tag",
+                     isExpanded: isExpanded("Facts.Attributes")) {
+                FieldRow("Nationality") { TextField("e.g. British",               text: $person.nationality) }
+                FieldRow("Religion", showDivider: false) {
+                    TextField("e.g. Church of England", text: $person.religion)
                 }
-            } label: {
-                Label("Facts", systemImage: "list.bullet")
-                    .font(.headline)
             }
         }
     }
@@ -768,20 +865,18 @@ public struct PersonEditorView: View {
     // MARK: - Additional Names
 
     private var additionalNamesSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Additional Names")) {
-                LabeledContent("Birth Name") { TextField("Name at birth (if different)", text: $person.birthName) }
-                if !person.llmAlternateNames.isEmpty {
-                    aiGeneratedLabel
-                    LabeledContent("Alternate Names") {
-                        Text(person.llmAlternateNames.joined(separator: ", "))
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                    }
+        EditorSection("Additional Names", systemImage: "person.badge.plus",
+                      isExpanded: isExpanded("Additional Names")) {
+            FieldRow("Birth Name",
+                     showDivider: !person.llmAlternateNames.isEmpty) {
+                TextField("Name at birth (if different)", text: $person.birthName)
+            }
+            if !person.llmAlternateNames.isEmpty {
+                aiGeneratedLabel
+                FieldRow("Alternate Names", showDivider: false) {
+                    Text(person.llmAlternateNames.joined(separator: ", "))
+                        .foregroundStyle(.secondary).textSelection(.enabled)
                 }
-            } label: {
-                Label("Additional Names", systemImage: "person.badge.plus")
-                    .font(.headline)
             }
         }
     }
@@ -789,25 +884,17 @@ public struct PersonEditorView: View {
     // MARK: - Media
 
     private var mediaSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Media")) {
-                if !person.imageURL.isEmpty || !person.additionalMedia.isEmpty {
-                    MediaGrid(
-                        imageURL: $person.imageURL,
-                        items:    $person.additionalMedia
-                    )
-                    .padding(.vertical, 4)
-                }
-                Button {
-                    person.additionalMedia.append(EditableMediaItem())
-                } label: {
-                    Label("Add Image", systemImage: "plus.circle")
-                }
-                .buttonStyle(.borderless)
-            } label: {
-                Label("Media", systemImage: "photo")
-                    .font(.headline)
+        EditorSection("Media", systemImage: "photo",
+                      isExpanded: isExpanded("Media")) {
+            if !person.imageURL.isEmpty || !person.additionalMedia.isEmpty {
+                MediaGrid(imageURL: $person.imageURL, items: $person.additionalMedia)
+                    .padding(.vertical, 6)
             }
+            Button { person.additionalMedia.append(EditableMediaItem()) } label: {
+                Label("Add Image", systemImage: "plus.circle")
+            }
+            .buttonStyle(.borderless)
+            .padding(.vertical, 4)
         }
     }
 
@@ -816,25 +903,21 @@ public struct PersonEditorView: View {
     @ViewBuilder
     private var notesSection: some View {
         if !person.wikiSections.isEmpty {
-            Section {
-                DisclosureGroup(isExpanded: isExpanded("Notes")) {
-                    ForEach(person.wikiSections, id: \.title) { section in
-                        VStack(alignment: .leading, spacing: 6) {
-                            if !section.title.isEmpty {
-                                Text(section.title)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                            }
-                            Text(section.text)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+            EditorSection("Notes", systemImage: "doc.text",
+                          isExpanded: isExpanded("Notes")) {
+                ForEach(person.wikiSections, id: \.title) { section in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !section.title.isEmpty {
+                            Text(section.title)
+                                .font(.subheadline).fontWeight(.semibold)
                         }
-                        .padding(.vertical, 4)
+                        Text(section.text)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                } label: {
-                    Label("Notes", systemImage: "doc.text")
-                        .font(.headline)
+                    .padding(.vertical, 6)
+                    Divider()
                 }
             }
         }
@@ -843,34 +926,25 @@ public struct PersonEditorView: View {
     // MARK: - Sources
 
     private var sourcesSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Sources")) {
-                if !person.wikiTitle.isEmpty {
-                    wikiSourceRow
+        EditorSection("Sources", systemImage: "doc.badge.gearshape",
+                      isExpanded: isExpanded("Sources")) {
+            if !person.wikiTitle.isEmpty { wikiSourceRow }
+            if hasLLMData {
+                FieldRow("AI Analysis", showDivider: false) {
+                    Label("Claude AI (Anthropic)", systemImage: "wand.and.stars")
+                        .foregroundStyle(.secondary)
                 }
-                if hasLLMData {
-                    LabeledContent("AI Analysis") {
-                        Label("Claude AI (Anthropic)", systemImage: "wand.and.stars")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } label: {
-                Label("Sources", systemImage: "doc.badge.gearshape")
-                    .font(.headline)
             }
         }
     }
 
     @ViewBuilder
     private var wikiSourceRow: some View {
-        let encoded = person.wikiTitle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? person.wikiTitle
+        let encoded   = person.wikiTitle.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? person.wikiTitle
         let urlString = "https://en.wikipedia.org/wiki/" + encoded
         if let url = URL(string: urlString) {
-            LabeledContent("Wikipedia") {
-                Link(urlString, destination: url)
-                    .font(.caption)
-                    .lineLimit(1)
+            FieldRow("Wikipedia", showDivider: hasLLMData) {
+                Link(urlString, destination: url).lineLimit(1)
             }
         }
     }
@@ -884,59 +958,54 @@ public struct PersonEditorView: View {
     // MARK: - Other
 
     private var otherSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: isExpanded("Other")) {
-                SubGroup(title: "Parents", systemImage: "person.circle",
-                         isExpanded: isExpanded("Other.Parents")) {
-                    LabeledContent("Father") { TextField("Father's full name", text: $person.father) }
-                    LabeledContent("Mother") { TextField("Mother's full name", text: $person.mother) }
+        EditorSection("Other", systemImage: "ellipsis.circle",
+                      isExpanded: isExpanded("Other")) {
+            SubGroup(title: "Parents", systemImage: "person.circle",
+                     isExpanded: isExpanded("Other.Parents")) {
+                FieldRow("Father") { TextField("Father's full name", text: $person.father) }
+                FieldRow("Mother", showDivider: false) {
+                    TextField("Mother's full name", text: $person.mother)
                 }
-
-                SubGroup(title: "Children", systemImage: "person.2.fill",
-                         isExpanded: isExpanded("Other.Children")) {
-                    ForEach($person.children) { $child in
+            }
+            Divider()
+            SubGroup(title: "Children", systemImage: "person.2.fill",
+                     isExpanded: isExpanded("Other.Children")) {
+                ForEach($person.children) { $child in
+                    HStack {
+                        TextField("Child's full name", text: $child.name)
+                            .textFieldStyle(.plain)
+                        Button { person.children.removeAll { $0.id == child.id } } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 5)
+                    Divider()
+                }
+                Button { person.children.append(EditablePersonRef()) } label: {
+                    Label("Add Child", systemImage: "plus.circle")
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
+            }
+            if !person.influentialPeople.isEmpty {
+                Divider()
+                aiGeneratedLabel
+                ForEach(person.influentialPeople, id: \.name) { influentialPerson in
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
-                            TextField("Child's full name", text: $child.name)
-                            Button {
-                                person.children.removeAll { $0.id == child.id }
-                            } label: {
-                                Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-                            }
-                            .buttonStyle(.borderless)
+                            Text(influentialPerson.name).fontWeight(.medium)
+                            Text("· \(influentialPerson.relationship)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if let note = influentialPerson.note {
+                            Text(note).font(.caption).foregroundStyle(.tertiary)
                         }
                     }
-                    Button {
-                        person.children.append(EditablePersonRef())
-                    } label: {
-                        Label("Add Child", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.borderless)
+                    .padding(.vertical, 5)
+                    .padding(.leading, 22)
+                    Divider().padding(.leading, 22)
                 }
-
-                if !person.influentialPeople.isEmpty {
-                    aiGeneratedLabel
-                        .padding(.leading, 10)
-                    ForEach(person.influentialPeople, id: \.name) { influentialPerson in
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(influentialPerson.name).fontWeight(.medium)
-                                Text("· \(influentialPerson.relationship)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let note = influentialPerson.note {
-                                Text(note)
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                        .padding(.leading, 26)
-                    }
-                }
-            } label: {
-                Label("Other", systemImage: "ellipsis.circle")
-                    .font(.headline)
             }
         }
     }
