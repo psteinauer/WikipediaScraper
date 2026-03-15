@@ -569,6 +569,14 @@ public struct PersonEditorView: View {
         "Media", "Notes", "Sources", "Other"
     ]
 
+    /// Sub-section keys that belong to each top-level section.
+    private static let subSections: [String: [String]] = [
+        "Events": ["Events.Birth", "Events.Death", "Events.Burial", "Events.Baptism",
+                   "Events.Spouses", "Events.TitledPositions", "Events.CustomEvents"],
+        "Facts":  ["Facts.Honorifics", "Facts.Custom", "Facts.Occupations", "Facts.Attributes"],
+        "Other":  ["Other.Parents", "Other.Children"],
+    ]
+
     @State private var expandedSections: Set<String> = ["Name and Gender"]
 
     public init(person: Binding<EditablePerson>) {
@@ -581,17 +589,36 @@ public struct PersonEditorView: View {
             set: { newValue in
                 withAnimation(.easeInOut(duration: 0.2)) {
                     #if os(macOS)
-                    let optionDown = NSEvent.modifierFlags.contains(.option)
+                    let flags       = NSEvent.modifierFlags
+                    let optionDown  = flags.contains(.option)
+                    let commandDown = flags.contains(.command)
                     #else
-                    let optionDown = false
+                    let optionDown  = false
+                    let commandDown = false
                     #endif
-                    if optionDown && PersonEditorView.topLevelSections.contains(section) {
+
+                    let isTopLevel = PersonEditorView.topLevelSections.contains(section)
+
+                    if commandDown && optionDown && isTopLevel {
+                        // ⌘⌥  — expand/collapse all other top-level sections;
+                        //        leave sub-section states untouched.
+                        let others = PersonEditorView.topLevelSections.filter { $0 != section }
+                        if newValue { expandedSections.formUnion(others) }
+                        else        { expandedSections.subtract(others) }
+                        if newValue { expandedSections.insert(section) }
+                        else        { expandedSections.remove(section) }
+                    } else if optionDown && isTopLevel {
+                        // ⌥   — expand/collapse this section and all its sub-sections.
+                        let subs = PersonEditorView.subSections[section] ?? []
                         if newValue {
-                            expandedSections.formUnion(PersonEditorView.topLevelSections)
+                            expandedSections.insert(section)
+                            expandedSections.formUnion(subs)
                         } else {
-                            expandedSections.subtract(PersonEditorView.topLevelSections)
+                            expandedSections.remove(section)
+                            expandedSections.subtract(subs)
                         }
                     } else {
+                        // Plain click — toggle only this section.
                         if newValue { expandedSections.insert(section) }
                         else        { expandedSections.remove(section) }
                     }
