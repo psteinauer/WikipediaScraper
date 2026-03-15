@@ -622,7 +622,8 @@ public struct PersonEditorView: View {
                                                        value: geo.size.height)
                             }
                         }
-                    if !person.imageURL.isEmpty && nameCardHeight > 0 {
+                    if !person.imageURL.isEmpty && nameCardHeight > 0
+                        && expandedSections.contains("Name and Gender") {
                         MediaThumbnail(urlString: person.imageURL, height: nameCardHeight)
                     }
                 }
