@@ -25,8 +25,8 @@ Double-click the app in Finder or Launchpad to open it. On first launch macOS ma
 
 ### How to use it
 
-1. **Paste Wikipedia URLs** into the address bar at the top. Each URL becomes a chip; add as many people as you like, then press ⌘↩ (or click the fetch button) to load them all at once.
-2. The app fetches each article, parses the infobox, and populates all fields. Fetched people appear in the **People** list in the sidebar.
+1. **Paste Wikipedia URLs** into the address bar at the top. Each URL becomes a chip; add as many people as you like, then press ⌘↩ (or click the fetch button) to load them all at once. The app fetches automatically when a URL is added if no fetch is already running.
+2. The app fetches each article, parses the infobox, and populates all fields. Fetched people appear in the **People** list in the sidebar. On launch, if URLs are saved from a previous session and the people list is empty, the app re-fetches all URLs automatically.
 3. **Set fetch options** in the sidebar panel before (or after) fetching:
    - **AI Analysis** — enriches data with Claude AI (requires an Anthropic API key).
    - **Notes** — appends Wikipedia article sections as GEDCOM NOTE records.
@@ -38,6 +38,17 @@ Double-click the app in Finder or Launchpad to open it. On first launch macOS ma
    - **Export as ZIP… (⌘⇧E)** — saves a GEDZIP archive containing `gedcom.ged` plus all portrait and media images.
    - **Open in MacFamilyTree 11** — exports a ZIP and opens it directly in MacFamilyTree.
    - **View GEDCOM…** — previews the raw GEDCOM text in a scrollable sheet with copy and save options.
+
+### Share to app
+
+The macOS app installs a **Share Extension** (`WikipediaToGEDCOMShareMac`). To send a Wikipedia page directly from Safari or Chrome:
+
+1. Click the Share button in the browser toolbar (or use the Share menu item).
+2. Choose **Wikipedia to GEDCOM** from the sharing destinations.
+3. A small confirmation sheet appears showing the URL. Click **Add** to send it to the app, or **Cancel** to dismiss.
+4. The app opens (or comes to the front) and begins fetching the article immediately.
+
+The macOS app also registers as a **Services provider**. Any application that supports the macOS Services menu can send a selected URL to the app via **Services > Add to Wikipedia to GEDCOM**.
 
 ![macOS app — URL bar, sidebar with fetch options and people list, person editor](docs/images/macos-overview.svg)
 
@@ -60,7 +71,7 @@ The detail panel shows the selected person's data organised into eight collapsib
 | **Sources** | Wikipedia article citation; AI Analysis citation (shown when AI Analysis has run) |
 | **Other** | Parents (father, mother); Children. **AI-identified influential people appear inline in blue** with name, relationship, and note fields. |
 
-When **AI Analysis** is enabled, all Claude-enriched items are integrated directly into the relevant sections and shown in **blue text** to distinguish them from infobox-parsed data. They are fully editable and deletable — identical in behaviour to standard items.
+When **AI Analysis** is enabled, all Claude-enriched items are integrated directly into the relevant sections and shown in **blue text** to distinguish them from infobox-parsed data. They are fully editable and deletable — identical in behaviour to standard items. When AI Analysis results arrive, sections containing new data **automatically expand** so results are immediately visible.
 
 ![Person editor — AI-generated items shown inline in blue alongside standard items](docs/images/person-editor-llm.svg)
 
@@ -80,7 +91,7 @@ All sections except **Name and Gender** start collapsed by default.
 
 ### Installation
 
-Open the dedicated Xcode project and run the `WikipediaScraperIPad` scheme on an iPad or iPad simulator.
+Open the workspace in Xcode and run the `Wikipedia to GEDCOM (iPadOS)` scheme on an iPad or iPad simulator.
 
 To build for a connected iPad device:
 
@@ -97,8 +108,8 @@ make ipad-sim    # builds for iPad Pro 13-inch (M5) simulator
 
 ### How to use it
 
-1. **Paste Wikipedia URLs** into the address bar at the top and tap Return (or the fetch button).
-2. The app fetches each article and populates the People list.
+1. **Paste Wikipedia URLs** into the address bar at the top and tap Return (or the fetch button). The app fetches the article immediately when a URL is added.
+2. The app fetches each article and populates the People list. On launch, saved URLs are re-fetched automatically if the people list is empty.
 3. **Set fetch options** in the strip below the URL bar: AI Analysis, Notes, All Images, Main Person Only.
 4. **Select a person** from the sidebar to review and edit their data.
 5. **Export** using the toolbar button (top-right):
@@ -106,6 +117,14 @@ make ipad-sim    # builds for iPad Pro 13-inch (M5) simulator
    - **Export as ZIP…** — downloads all media, then opens the document picker to save a `.zip` GEDZIP archive.
 
 Tap the **gear icon** in the toolbar to configure the Claude AI API key.
+
+### Share to app
+
+The iPadOS app installs a **Share Extension** (`WikipediaToGEDCOMShare`). To send a Wikipedia page directly from Safari or another browser:
+
+1. Tap the Share button and choose **Wikipedia to GEDCOM**.
+2. The extension immediately routes the URL to the app via the `wikipedia-gedcom://` URL scheme — no confirmation sheet is shown.
+3. The app opens (or comes to the front) and begins fetching the article.
 
 The iPadOS app supports all four orientations and multi-window (Stage Manager) on supported hardware.
 
@@ -229,6 +248,7 @@ An internet connection is required to fetch Wikipedia articles and images.
 - **AI Analysis** via Claude API (Anthropic) — enriches each article with alternate names, titles, facts, events, and influential people; results appear **inline in blue** within the relevant editor sections and are stored separately in the GEDCOM output cited as "Claude AI (Anthropic)"
 - **MacFamilyTree 11 integration** (macOS app) — one-click export and open
 - **GEDCOM preview** (macOS app) — scrollable, selectable, monospace view of the raw GEDCOM output with copy and save options
+- **Share Extension** (macOS and iPadOS) — send a Wikipedia URL from Safari or Chrome directly to the app
 - Emits titled positions (reign, office) as **GEDCOM EVEN with TYPE "Nobility title"**
 - Predecessor/successor links use **ASSO + RELA** (Influential Persons)
 - Source citations use **SOUR.WWW** (top-level domain) + **PAGE** (specific article URL) + **DATA.TEXT** (article extract)
@@ -345,6 +365,32 @@ Use `--nopeople` (CLI) or the **Main Person Only** option (apps) to include only
 
 ---
 
+## Opening in Xcode
+
+The recommended way to open the project in Xcode is the workspace, which combines all targets:
+
+```bash
+open WikipediaScraper.xcworkspace
+```
+
+Individual Xcode projects are also available:
+
+| Project | Contents |
+|---------|----------|
+| `WikipediaScraperMac.xcodeproj` | macOS app (`WikipediaScraperApp`), macOS Share Extension (`WikipediaToGEDCOMShareMac`), CLI tool (`WikipediaScraper`) |
+| `WikipediaScraperIPad.xcodeproj` | iPadOS app (`WikipediaScraperIPad`), iPadOS Share Extension (`WikipediaToGEDCOMShare`) |
+
+### Xcode schemes
+
+| Project / Workspace | Scheme | Builds |
+|---------------------|--------|--------|
+| `WikipediaScraperMac.xcodeproj` | Wikipedia to GEDCOM (macOS) | macOS app + Share Extension |
+| `WikipediaScraperMac.xcodeproj` | WikipediaScraper CLI | CLI tool only |
+| `WikipediaScraperIPad.xcodeproj` | Wikipedia to GEDCOM (iPadOS) | iPadOS app + Share Extension |
+| `WikipediaScraper.xcworkspace` | Build All | All three top-level targets |
+
+---
+
 ## Build targets
 
 | Command | Description |
@@ -367,6 +413,14 @@ Use `--nopeople` (CLI) or the **Main Person Only** option (apps) to include only
 ## Source code layout
 
 ```
+WikipediaScraper.xcworkspace/          Xcode workspace — opens all targets together
+WikipediaScraperMac.xcodeproj/         Xcode project: macOS app + Share Extension + CLI
+WikipediaScraperIPad.xcodeproj/        Xcode project: iPadOS app + Share Extension
+WikipediaScraperMac.entitlements       macOS app entitlements (outgoing URL scheme, etc.)
+WikipediaToGEDCOMShareMac.entitlements macOS Share Extension entitlements
+WikipediaScraperIPad.entitlements      iPadOS app entitlements
+WikipediaToGEDCOMShare.entitlements    iPadOS Share Extension entitlements
+
 Sources/
 ├── WikipediaScraperCore/          Shared library (CLI + macOS app + iPadOS app)
 │   ├── PersonModel.swift          Data model — PersonData, GEDCOMDate, SpouseInfo, …
@@ -394,22 +448,39 @@ Sources/
 │   └── WikipediaScraperCommand.swift  Entry point, argument parsing, orchestration
 │
 ├── WikipediaScraperApp/           macOS SwiftUI app target
-│   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
+│   ├── WikipediaScraperApp.swift  @main, @NSApplicationDelegateAdaptor, FocusedValues,
+│   │                              menu bar commands; WindowGroup.handlesExternalEvents(matching:[])
+│   ├── AppDelegate.swift          NSApplicationDelegate — routes wikipedia-gedcom:// URLs
+│   │                              via URLRouter; handles reopen; registers Services provider
+│   ├── URLRouter.swift            @MainActor singleton — delivers URL-scheme events to the
+│   │                              active window's handler; queues URLs on cold launch
 │   ├── ContentView.swift          URL chip bar, sidebar, detail panel, toolbar
-│   ├── PersonViewModel.swift      ObservableObject ViewModel — fetch, export, AI, preview
+│   ├── PersonViewModel.swift      ObservableObject ViewModel — fetch, export, AI, preview;
+│   │                              handleOpenURL, addURL, removeURL, fetchOnLaunch
 │   ├── LLMSettingsView.swift      Settings popover — Claude AI API key
 │   ├── Info.plist                 macOS bundle metadata
 │   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
 │
+├── WikipediaToGEDCOMShareMac/     macOS Share Extension target
+│   ├── ShareViewController.swift  NSViewController confirmation sheet (title label,
+│   │                              URL label, Add / Cancel buttons); opens app via
+│   │                              wikipedia-gedcom://add?url=<encoded>
+│   └── Info.plist                 Extension metadata (NSExtension, NSServices)
+│
+├── WikipediaToGEDCOMShare/        iPadOS Share Extension target
+│   ├── ShareViewController.swift  UIViewController that immediately routes the shared URL
+│   │                              to the containing app via wikipedia-gedcom://add?url=…
+│   └── Info.plist                 Extension metadata
+│
 └── WikipediaScraperIPad/          iPadOS SwiftUI app target
-    ├── WikipediaScraperIPadApp.swift  @main (iOS) + macOS stub for swift build
+    ├── WikipediaScraperIPadApp.swift  @main (iOS) + macOS stub for swift build;
+    │                                  onOpenURL → handleOpenURL → addURL
     ├── iPadContentView.swift      Touch-optimised URL bar, .fileExporter modifiers
     ├── iPadPersonViewModel.swift  ViewModel — fetch + iOS document picker export
     ├── Info.plist                 iPadOS bundle metadata
     └── Assets.xcassets/           iPad app icon (9 PNG sizes)
 
 make_icon.swift                    Icon generator — regenerates macOS + iPadOS PNGs
-WikipediaScraperIPad.xcodeproj/    Xcode project for the iPadOS app (iOS Application target)
 ```
 
 ---

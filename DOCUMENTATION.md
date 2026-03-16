@@ -33,25 +33,33 @@ This document covers the software architecture, data-flow pipelines, and module 
    - [--nopeople Mode](#55---nopeople-mode)
 6. [macOS App — WikipediaScraperApp](#6-macos-app--wikipediascraperapp)
    - [Scene and Window Setup](#61-scene-and-window-setup)
-   - [App Data Flow](#62-app-data-flow)
-   - [PersonViewModel](#63-personviewmodel)
-   - [ContentView](#64-contentview)
-   - [Export Paths](#65-export-paths)
-   - [LLMSettingsView](#66-llmsettingsview)
+   - [AppDelegate](#62-appdelegate)
+   - [URLRouter](#63-urlrouter)
+   - [App Data Flow](#64-app-data-flow)
+   - [PersonViewModel](#65-personviewmodel)
+   - [ContentView](#66-contentview)
+   - [Export Paths](#67-export-paths)
+   - [LLMSettingsView](#68-llmsettingsview)
 7. [iPadOS App — WikipediaScraperIPad](#7-ipados-app--wikipediascraperipad)
    - [Scene Setup](#71-scene-setup)
    - [Platform Compilation Strategy](#72-platform-compilation-strategy)
    - [iPadPersonViewModel](#73-ipadpersonviewmodel)
    - [iPadContentView](#74-ipadcontentview)
    - [Export Paths](#75-export-paths)
-8. [Key Algorithms](#8-key-algorithms)
-   - [Infobox Extraction](#81-infobox-extraction)
-   - [Date Parsing](#82-date-parsing)
-   - [GEDCOM Name Construction](#83-gedcom-name-construction)
-   - [Xref Allocation and Deduplication](#84-xref-allocation-and-deduplication)
-9. [GEDCOM 7.0 Output Reference](#9-gedcom-70-output-reference)
-10. [Configuration System](#10-configuration-system)
-11. [Icon Generation](#11-icon-generation)
+8. [Share Extensions](#8-share-extensions)
+   - [Overview and URL Scheme IPC](#81-overview-and-url-scheme-ipc)
+   - [macOS Share Extension — WikipediaToGEDCOMShareMac](#82-macos-share-extension--wikipediatogedcomsharemac)
+   - [iPadOS Share Extension — WikipediaToGEDCOMShare](#83-ipados-share-extension--wikipediatogedcomshare)
+   - [Receiving App Side — handleOpenURL](#84-receiving-app-side--handleopenurl)
+9. [Key Algorithms](#9-key-algorithms)
+   - [Infobox Extraction](#91-infobox-extraction)
+   - [Date Parsing](#92-date-parsing)
+   - [GEDCOM Name Construction](#93-gedcom-name-construction)
+   - [Xref Allocation and Deduplication](#94-xref-allocation-and-deduplication)
+10. [GEDCOM 7.0 Output Reference](#10-gedcom-70-output-reference)
+11. [Configuration System](#11-configuration-system)
+12. [Xcode Projects and Workspace](#12-xcode-projects-and-workspace)
+13. [Icon Generation](#13-icon-generation)
 
 ---
 
@@ -62,6 +70,15 @@ WikipediaScraper/
 ├── Package.swift                      SPM manifest — five targets
 ├── Makefile                           Build, install, app-bundle, ipad, test targets
 ├── make_icon.swift                    Standalone Swift script — generates icon PNGs
+│
+├── WikipediaScraper.xcworkspace/      Xcode workspace — combines all Xcode projects
+├── WikipediaScraperMac.xcodeproj/     Xcode project: macOS app + Share Extension + CLI
+├── WikipediaScraperIPad.xcodeproj/    Xcode project: iPadOS app + Share Extension
+│
+├── WikipediaScraperMac.entitlements       macOS app entitlements
+├── WikipediaToGEDCOMShareMac.entitlements macOS Share Extension entitlements
+├── WikipediaScraperIPad.entitlements      iPadOS app entitlements
+├── WikipediaToGEDCOMShare.entitlements    iPadOS Share Extension entitlements
 │
 ├── Sources/
 │   ├── WikipediaScraperCore/          Library — shared by CLI, macOS app, and iPadOS app
@@ -86,23 +103,36 @@ WikipediaScraper/
 │   │   ├── SourceDetailView.swift     Detail view for a selected SourceInfo
 │   │   ├── URLListBar.swift           Reusable URL chip bar (iPad)
 │   │   ├── AIProgressSheet.swift      Sheet showing per-article AI analysis progress
-│   │   └── GEDCOMPreviewSheet.swift   Sheet with syntax-highlighted GEDCOM preview + copy/save
+│   │   └── GEDCOMPreviewSheet.swift   Sheet with GEDCOM preview + copy/save
 │   │
 │   ├── WikipediaScraper/              CLI executable target
 │   │   └── WikipediaScraperCommand.swift
 │   │
 │   ├── WikipediaScraperApp/           macOS SwiftUI app target
-│   │   ├── WikipediaScraperApp.swift  @main, FocusedValues, menu bar commands
+│   │   ├── WikipediaScraperApp.swift  @main, @NSApplicationDelegateAdaptor, FocusedValues,
+│   │   │                              menu bar commands
+│   │   ├── AppDelegate.swift          NSApplicationDelegate — URL-scheme routing, reopen guard,
+│   │   │                              NSServices registration
+│   │   ├── URLRouter.swift            @MainActor singleton — queues/delivers URL events
 │   │   ├── ContentView.swift          URL chip bar, NavigationSplitView, sidebar, detail
 │   │   ├── PersonViewModel.swift      ViewModel — multi-person fetch, NSSavePanel export,
-│   │   │                              MacFamilyTree integration, GEDCOM preview
+│   │   │                              MacFamilyTree integration, GEDCOM preview,
+│   │   │                              handleOpenURL / addURL / removeURL / fetchOnLaunch
 │   │   ├── LLMSettingsView.swift      macOS Settings popover — AI toggle + API key
 │   │   ├── Info.plist
 │   │   └── Assets.xcassets/           macOS app icon (7 PNG sizes)
 │   │
+│   ├── WikipediaToGEDCOMShareMac/     macOS Share Extension target
+│   │   ├── ShareViewController.swift  NSViewController confirmation sheet
+│   │   └── Info.plist
+│   │
+│   ├── WikipediaToGEDCOMShare/        iPadOS Share Extension target
+│   │   ├── ShareViewController.swift  UIViewController — immediate URL routing
+│   │   └── Info.plist
+│   │
 │   └── WikipediaScraperIPad/          iPadOS SwiftUI app target
 │       ├── WikipediaScraperIPadApp.swift  @main (iOS) + macOS compilation stub
-│       ├── iPadContentView.swift      Touch UI, .fileExporter modifiers
+│       ├── iPadContentView.swift      Touch UI, .fileExporter modifiers, onOpenURL
 │       ├── iPadPersonViewModel.swift  ViewModel — fetch + FileDocument export
 │       ├── Info.plist
 │       └── Assets.xcassets/           iPad app icon (9 PNG sizes)
@@ -119,6 +149,8 @@ WikipediaScraper/
 | `WikipediaScraper` | Executable | macOS 13 | WikipediaScraperCore, ArgumentParser |
 | `WikipediaScraperApp` | Executable | macOS 13 | WikipediaScraperCore, WikipediaScraperSharedUI |
 | `WikipediaScraperIPad` | Executable | iOS 16 | WikipediaScraperCore, WikipediaScraperSharedUI |
+
+The Share Extension targets (`WikipediaToGEDCOMShareMac`, `WikipediaToGEDCOMShare`) are defined in the Xcode projects, not in `Package.swift`. They have no SPM dependencies.
 
 All public types in `WikipediaScraperCore` and `WikipediaScraperSharedUI` carry explicit `public` access modifiers so they are visible across module boundaries. All cross-module structs carry explicit `public init(...)` declarations because synthesised memberwise initialisers are `internal` by default in Swift.
 
@@ -162,17 +194,23 @@ All public types in `WikipediaScraperCore` and `WikipediaScraperSharedUI` carry 
 │                          │    GEDCOMPreviewSheet                 │
 └──────────────────────────┼───────────────────────────────────────┘
                            │
-          ┌────────────────┼──────────────────┐
-          │                │                  │
-  WikipediaScraper   WikipediaScraperApp  WikipediaScraperIPad
-  (CLI)              (macOS SwiftUI)      (iPadOS SwiftUI)
-  AsyncParsable      PersonViewModel      iPadPersonViewModel
-  Command            ContentView          iPadContentView
-                     NSSavePanel          .fileExporter
+          ┌────────────────┼───────────────────┐
+          │                │                   │
+  WikipediaScraper   WikipediaScraperApp   WikipediaScraperIPad
+  (CLI)              (macOS SwiftUI)       (iPadOS SwiftUI)
+  AsyncParsable      PersonViewModel       iPadPersonViewModel
+  Command            ContentView           iPadContentView
+                     AppDelegate           onOpenURL → handleOpenURL
+                     URLRouter             .fileExporter
+                     NSSavePanel
                      LLMSettingsView
+          │                                    │
+  WikipediaToGEDCOM    ←— wikipedia-gedcom:// URL scheme —→
+  ShareMac                                 WikipediaToGEDCOMShare
+  (macOS Share Ext)                        (iPadOS Share Ext)
 ```
 
-All three consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The macOS and iPadOS apps share `EditableTypes`, `PersonEditorView`, `FetchOptionsView`, `LLMSettings`, and the AI/preview sheet components from `WikipediaScraperSharedUI`; they differ only in their export mechanisms, window setup, and settings UI.
+All three consumers call the same `WikipediaClient`, `InfoboxParser`, `GEDCOMBuilder`, and `GEDZIPBuilder` APIs. The macOS and iPadOS apps share `EditableTypes`, `PersonEditorView`, `FetchOptionsView`, `LLMSettings`, and the AI/preview sheet components from `WikipediaScraperSharedUI`; they differ only in their export mechanisms, window setup, URL-scheme handling, and settings UI.
 
 ---
 
@@ -661,6 +699,22 @@ The eight top-level sections correspond to the keys in `PersonEditorView.topLeve
 
 LLM-enriched items in every section use identical `FieldRow` / `TextField` layout to standard items. They are distinguished solely by `.foregroundStyle(.blue)` on the text field content. All have a Remove button that mutates the corresponding `llmXxx` or `influentialPeople` array on `EditablePerson`.
 
+#### Auto-expand on AI data arrival
+
+`PersonEditorView` observes `hasLLMData` (a computed `Bool` on the bound `EditablePerson`) using `.onChange(of: hasLLMData)`. When this transitions to `true` — meaning AI Analysis results have just arrived — the view automatically expands every section that contains newly populated LLM data:
+
+```
+hasLLMData becomes true
+   │
+   ├─ llmAlternateNames non-empty → insert "Additional Names" into expandedSections
+   ├─ llmEvents non-empty         → insert "Events"
+   ├─ llmTitles non-empty         → insert "Facts" + "Facts.Honorifics"
+   ├─ llmFacts non-empty          → insert "Facts" + "Facts.Custom"
+   └─ influentialPeople non-empty → insert "Other"
+```
+
+The expansion is animated with `.easeInOut(duration: 0.2)` so the reveal is smooth.
+
 #### Expand / collapse behaviour
 
 Expand/collapse state is tracked in `@State private var expandedSections: Set<String>`, initialised to `["Name and Gender"]` so only that section is open by default.
@@ -809,6 +863,8 @@ struct WikipediaScraper: AsyncParsableCommand {
 - `--allimages` implies `--zip`; incompatible with `--preflight` and `--mappings`.
 - `--output` incompatible with `--preflight`.
 
+The `Sex` type from `WikipediaScraperCore` conforms to `CustomStringConvertible` via a `@retroactive` extension in the CLI module to produce clean diagnostic output.
+
 ### 5.2 CLI Data Flow
 
 ```
@@ -910,11 +966,14 @@ This runs before `GEDCOMBuilder.build()`, so the builder never sees the stripped
 ```swift
 @main
 struct WikipediaScraperApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .frame(minWidth: 820, minHeight: 560)
         }
+        .handlesExternalEvents(matching: [])
         .defaultSize(width: 1040, height: 740)
         .commands {
             CommandGroup(replacing: .newItem) {}
@@ -923,6 +982,10 @@ struct WikipediaScraperApp: App {
     }
 }
 ```
+
+**`.handlesExternalEvents(matching: [])`** opts the `WindowGroup` completely out of SwiftUI's built-in URL event routing. Without this modifier, SwiftUI would create a new window each time a `wikipedia-gedcom://` URL is delivered (e.g. from the Share Extension or Services menu). URL delivery is handled entirely by `AppDelegate` and `URLRouter` instead.
+
+`@NSApplicationDelegateAdaptor(AppDelegate.self)` installs the custom `AppDelegate` before the scene is created.
 
 `AppCommands` wires the active window's `PersonViewModel` into the macOS menu bar using SwiftUI's focused-value system:
 
@@ -936,54 +999,129 @@ struct WikipediaScraperApp: App {
 
 This allows File > Export as GEDCOM… and File > Export as ZIP… to operate on whichever window is currently focused.
 
-### 6.2 App Data Flow
+### 6.2 AppDelegate
+
+**File:** `Sources/WikipediaScraperApp/AppDelegate.swift`
+
+`final class AppDelegate: NSObject, NSApplicationDelegate`
+
+Responsibilities:
+
+**URL-scheme routing** — `application(_:open:)` is called by the OS whenever a `wikipedia-gedcom://` URL is opened (from the Share Extension or Services menu, or when another app calls `NSWorkspace.shared.open(_:)`). The delegate dispatches each URL to `URLRouter.shared.route(_:)` on the main actor:
+
+```swift
+func application(_ application: NSApplication, open urls: [URL]) {
+    Task { @MainActor in
+        urls.forEach { URLRouter.shared.route($0) }
+    }
+}
+```
+
+**Reopen guard** — `applicationShouldHandleReopen(_:hasVisibleWindows:)` prevents SwiftUI from creating a new window when the user clicks the Dock icon while the app is already running. If no window is visible, the first existing window is brought to the front instead:
+
+```swift
+func applicationShouldHandleReopen(_ sender: NSApplication,
+                                   hasVisibleWindows: Bool) -> Bool {
+    if !hasVisibleWindows { sender.windows.first?.makeKeyAndOrderFront(nil) }
+    return false   // false = don't let SwiftUI create a new window
+}
+```
+
+**Services registration** — `applicationDidFinishLaunching(_:)` sets `NSApp.servicesProvider = self` and calls `NSUpdateDynamicServices()`. This registers the app as a provider of the "Add to Wikipedia to GEDCOM" macOS Service. When the user invokes the service, `addURLFromService(_:userData:error:)` reads the URL from the pasteboard, encodes it, and opens it via `NSWorkspace.shared.open(_:)` using the `wikipedia-gedcom://add?url=…` scheme — so it re-enters the same URL-routing path as the Share Extension.
+
+### 6.3 URLRouter
+
+**File:** `Sources/WikipediaScraperApp/URLRouter.swift`
+
+```swift
+@MainActor
+final class URLRouter {
+    static let shared = URLRouter()
+
+    private var handler: ((URL) -> Void)?
+    private var pending: URL?
+
+    func register(handler: @escaping (URL) -> Void)
+    func route(_ url: URL)
+}
+```
+
+A `@MainActor` singleton that decouples URL delivery (AppDelegate) from URL consumption (ContentView / PersonViewModel). The decoupling is necessary because `AppDelegate.application(_:open:)` can fire during cold launch, before `ContentView.onAppear` has registered a handler.
+
+**`register(handler:)`** — called by `ContentView.onAppear`. Stores the handler and immediately replays any pending URL that arrived before registration.
+
+**`route(_:)`** — called by `AppDelegate`. If a handler is registered, calls it immediately. If not (cold launch), stores the URL as `pending`.
+
+This guarantees that no URL is dropped regardless of whether the app was already running or just launched in response to a URL open.
+
+### 6.4 App Data Flow
 
 ```
-User clicks + in URL chip bar → AddURLSheet → vm.addURL()
-        │
-        ▼ ⌘↩ or fetch button pressed → vm.fetch()
+App launch
+   │
+   ├─ ContentView.onAppear
+   │      URLRouter.shared.register { url in vm.handleOpenURL(url) }
+   │
+   └─ ContentView.task
+          vm.fetchOnLaunch()
+              └─ if urls non-empty AND persons empty → fetch()
+
+User adds URL chip → vm.addURL(urlString)
+   │
+   ├─ append to vm.urls (persisted to UserDefaults)
+   └─ if not already loading → Task { fetchSingleURL(urlString) }
+
+User removes URL chip → vm.removeURL(urlString)
+   │
+   ├─ remove from vm.urls
+   ├─ persons = []          ← clear all results
+   └─ if urls non-empty → Task { fetch() }   ← re-fetch remaining
+
+⌘↩ or fetch button → vm.fetch()
+
 PersonViewModel.fetch()   (loops over all URLs)
-        │
-        for each URL:
-        ├─ WikipediaClient.pageTitle(from: url)
-        ├─ WikipediaClient.fetchSummary()   ─────┐ concurrent async let
-        ├─ WikipediaClient.fetchWikitext()  ─────┘
-        │
-        ├─ InfoboxParser.parse(wikitext:pageTitle:)
-        ├─ EditablePerson(from: parsedPerson)
-        │    + merge summary.title, extract, imageURL
-        │
-        ├─ (if useNotes)     WikipediaClient.fetchSections()
-        ├─ (if useAllImages) WikipediaClient.fetchAllImageURLs()
-        │
-        └─ (if LLMSettings.shared.isEnabled)
-              LLMClient.analyze(pageTitle:wikitext:extract:apiKey:onProgress:)
-              → [PersonFact] / [CustomEvent] / [InfluentialPerson] mapped to Editable types
-              → editable.llmAlternateNames / llmTitles / llmFacts / llmEvents / influentialPeople
-              → AIProgressSheet streams live messages
-              → items appear inline in blue within their respective editor sections
-        │
-        ├─ upsert into vm.persons (replace stub/existing by wikiTitle, else append)
-        └─ vm.selectedPersonID = editable.id
-                │
-                ▼
-    rebuildStubs() — adds minimal EditablePerson stubs for referenced family members
-                │
-                ▼ ContentView detail column shows PersonEditorView
-    person fields editable as TextFields via @Binding
-                │
-                ▼ Export button / File menu
-    persons.filter(!isStub).map(toPersonData())
-    GEDCOMBuilder.build(persons:)  →  GEDCOM text
-                │
-        ┌───────┴──────────────┬──────────────────┐
-        │ .ged                 │ .zip / MFT        │ preview
-        │ NSSavePanel          │ fetch images      │ GEDCOMPreviewSheet
-        │ write to URL         │ GEDZIPBuilder     │ (no file I/O)
-                               │ [open in MFT 11]
+   │
+   for each URL:
+   ├─ WikipediaClient.pageTitle(from: url)
+   ├─ WikipediaClient.fetchSummary()   ─────┐ concurrent async let
+   ├─ WikipediaClient.fetchWikitext()  ─────┘
+   │
+   ├─ InfoboxParser.parse(wikitext:pageTitle:)
+   ├─ EditablePerson(from: parsedPerson)
+   │    + merge summary.title, extract, imageURL
+   │
+   ├─ (if useNotes)     WikipediaClient.fetchSections()
+   ├─ (if useAllImages) WikipediaClient.fetchAllImageURLs()
+   │
+   └─ upsert into vm.persons (replace stub/existing by wikiTitle, else append)
+      vm.selectedPersonID = editable.id
+          │
+          ▼
+  rebuildStubs() — adds minimal EditablePerson stubs for referenced family members
+          │
+          ▼ ContentView detail column shows PersonEditorView
+  person fields editable as TextFields via @Binding
+          │
+          ▼ AI Analysis toolbar button → vm.analyzeWithLLM()
+  LLMClient.analyze(pageTitle:wikitext:extract:apiKey:onProgress:)
+  → [PersonFact] / [CustomEvent] / [InfluentialPerson] mapped to Editable types
+  → editable.llmAlternateNames / llmTitles / llmFacts / llmEvents / influentialPeople
+  → AIProgressSheet streams live messages
+  → PersonEditorView auto-expands sections containing new data
+  → items appear inline in blue within their respective editor sections
+          │
+          ▼ Export button / File menu
+  persons.filter(!isStub).map(toPersonData())
+  GEDCOMBuilder.build(persons:)  →  GEDCOM text
+          │
+  ┌───────┴──────────────┬──────────────────┐
+  │ .ged                 │ .zip / MFT        │ preview
+  │ NSSavePanel          │ fetch images      │ GEDCOMPreviewSheet
+  │ write to URL         │ GEDZIPBuilder     │ (no file I/O)
+                         │ [open in MFT 11]
 ```
 
-### 6.3 PersonViewModel
+### 6.5 PersonViewModel
 
 **File:** `Sources/WikipediaScraperApp/PersonViewModel.swift`
 
@@ -997,6 +1135,7 @@ PersonViewModel.fetch()   (loops over all URLs)
 | `persons` | `[EditablePerson]` | All fetched persons plus stubs; drives the sidebar list |
 | `selectedPersonID` | `UUID?` | Currently selected person in the sidebar |
 | `isLoading` | `Bool` | True while any URL is being fetched |
+| `isAnalyzing` | `Bool` | True while AI Analysis is running |
 | `errorMessage` | `String?` | Shown in the sidebar error banner |
 | `statusMessage` | `String?` | Shown in the toolbar while loading |
 | `mediaWarnings` | `[String]` | Per-image download failure messages; shown in an alert |
@@ -1007,6 +1146,18 @@ PersonViewModel.fetch()   (loops over all URLs)
 | `useNotes` | `Bool` | Persisted fetch option |
 | `useAllImages` | `Bool` | Persisted fetch option |
 | `noPeople` | `Bool` | Persisted fetch option; changing triggers `rebuildStubs()` |
+
+#### Key methods
+
+**`fetchOnLaunch()`** — called from `ContentView.task` on app start. Runs `fetch()` if `urls` is non-empty and `persons` is empty. This re-populates data from a previous session without requiring any user action.
+
+**`addURL(_ urlString: String)`** — appends the URL to `urls` if not already present, then immediately calls `fetchSingleURL(_:)` in a `Task` (unless a fetch is already in flight). This means pasting a URL or receiving one from the Share Extension triggers an automatic fetch.
+
+**`removeURL(_ urlString: String)`** — removes the URL from `urls`, clears `persons` entirely (since the full list of referenced stubs may have changed), then re-fetches all remaining URLs via `fetch()`. This keeps the displayed data consistent with the current URL set.
+
+**`handleOpenURL(_ url: URL)`** — parses a `wikipedia-gedcom://add?url=<encoded-url>` URL and calls `addURL(_:)`. Called by `URLRouter`'s registered handler.
+
+**`fetchSingleURL(_ urlString: String)`** — fetches one URL without clearing existing persons. Used for incremental adds.
 
 #### Key computed / derived state
 
@@ -1023,7 +1174,7 @@ func selectedPersonBinding() -> Binding<EditablePerson>?
 
 #### `rebuildStubs()`
 
-Called after every fetch and whenever `noPeople` changes. When `noPeople == false`, extracts all referenced names (spouses, children, father, mother, titledPositions predecessors/successors, and `influentialPeople.wikiTitle`) from full (non-stub) persons and creates minimal `EditablePerson` stubs for any not already present in `persons`. When `noPeople == true`, removes all stubs. Note: `influentialPeople` is now `[EditableInfluentialPerson]`, so `wikiTitle` is a plain `String` (not `String?`).
+Called after every fetch and whenever `noPeople` changes. When `noPeople == false`, extracts all referenced names (spouses, children, father, mother, titledPositions predecessors/successors, and `influentialPeople.wikiTitle`) from full (non-stub) persons and creates minimal `EditablePerson` stubs for any not already present in `persons`. When `noPeople == true`, removes all stubs.
 
 #### Export workflows
 
@@ -1045,7 +1196,7 @@ GEDZIPBuilder.create(gedcom:mediaFiles:at:)
 
 **`previewGEDCOM()`** — builds GEDCOM without saving; sets `gedcomPreviewText` and opens preview sheet.
 
-### 6.4 ContentView
+### 6.6 ContentView
 
 **File:** `Sources/WikipediaScraperApp/ContentView.swift`
 
@@ -1072,6 +1223,13 @@ ContentView (VStack)
                       or emptySourceState
 ```
 
+The `.task` modifier on the root view calls `vm.fetchOnLaunch()` on app start. The `.onAppear` modifier registers a URL handler with `URLRouter.shared`:
+
+```swift
+.task { await vm.fetchOnLaunch() }
+.onAppear { URLRouter.shared.register { url in vm.handleOpenURL(url) } }
+```
+
 The **URL chip bar** uses `ChipFlowLayout` — a custom `Layout` that places chips left-to-right, wrapping to new rows when the available width is exceeded. The last item is always the "+" add button. Each `URLChip` shows the domain name of the URL and has an × button to remove it.
 
 The **toolbar** provides:
@@ -1089,7 +1247,7 @@ Disabled when `!vm.hasData`.
 
 Two `.sheet` modifiers are attached to the root view: one for `GEDCOMPreviewSheet` and one for `AIProgressSheet`.
 
-### 6.5 Export Paths
+### 6.7 Export Paths
 
 #### Export as GEDCOM (.ged)
 
@@ -1113,7 +1271,7 @@ GEDCOMBuilder.build(persons: personDatas)   ← FILE tags use relative paths
 GEDZIPBuilder.create(gedcom:mediaFiles:at:) ← packs gedcom.ged + media/*
 ```
 
-### 6.6 LLMSettingsView
+### 6.8 LLMSettingsView
 
 **File:** `Sources/WikipediaScraperApp/LLMSettingsView.swift`
 
@@ -1155,6 +1313,8 @@ struct WikipediaScraperIPadApp {
 
 The `WindowGroup` enables multi-window support on iPadOS (Stage Manager on supported hardware). No `.commands {}` block is needed on iPadOS — there is no menu bar.
 
+URL-scheme delivery on iPadOS uses SwiftUI's `.onOpenURL` modifier in `iPadContentView`, which routes to `vm.handleOpenURL(_:)` → `vm.addURL(_:)`. The same `handleOpenURL` / `addURL` logic used on macOS is shared through `iPadPersonViewModel`.
+
 ### 7.2 Platform Compilation Strategy
 
 The iPad target is a standard SPM `.executableTarget`. Since `swift build` on macOS compiles **all** targets, the iPad source files would otherwise fail to compile (they reference `UIKit`, `UIActivityViewController`, etc., which are unavailable on macOS). The solution: every iPad-specific source file wraps its entire content in `#if os(iOS)`:
@@ -1183,7 +1343,7 @@ Build matrix summary:
 
 `@MainActor final class iPadPersonViewModel: ObservableObject`
 
-The fetch logic is identical to the macOS ViewModel. Export differs: rather than presenting `NSSavePanel`, the ViewModel builds a `FileDocument` value and sets a Boolean flag that triggers SwiftUI's `.fileExporter` modifier, which presents the iOS document picker.
+The fetch logic — including `fetchOnLaunch()`, `addURL(_:)`, `removeURL(_:)`, and `handleOpenURL(_:)` — is identical in structure to the macOS `PersonViewModel`. Export differs: rather than presenting `NSSavePanel`, the ViewModel builds a `FileDocument` value and sets a Boolean flag that triggers SwiftUI's `.fileExporter` modifier, which presents the iOS document picker.
 
 #### FileDocument types
 
@@ -1248,8 +1408,8 @@ Structurally parallel to the macOS `ContentView` but adapted for touch:
 | `NavigationSplitView` with sidebar + detail | `NavigationStack` with `PersonEditorView` pushed |
 | `NSSavePanel` triggered from ViewModel | `.fileExporter` modifiers on the view |
 | Settings in toolbar popover (`LLMSettingsView`) | Settings as a `.sheet` |
-| Empty state: "⌘↩ to fetch" | Empty state: "tap Fetch" |
-| `ProgressView().controlSize(.small)` | `ProgressView().controlSize(.regular)` |
+| `.task { await vm.fetchOnLaunch() }` | `.task { await vm.fetchOnLaunch() }` |
+| `URLRouter.shared.register` via `.onAppear` | `.onOpenURL { url in vm.handleOpenURL(url) }` |
 
 The two `.fileExporter` modifiers are applied to the root `VStack`:
 
@@ -1308,9 +1468,117 @@ vm.saveAsZip() async
 
 ---
 
-## 8. Key Algorithms
+## 8. Share Extensions
 
-### 8.1 Infobox Extraction
+### 8.1 Overview and URL Scheme IPC
+
+Both the macOS and iPadOS apps register the custom URL scheme `wikipedia-gedcom://`. The Share Extensions use this scheme as an inter-process communication channel: the extension opens `wikipedia-gedcom://add?url=<percent-encoded-url>` and the containing app handles it.
+
+URL scheme registration is declared in each app's `Info.plist` under `CFBundleURLTypes`. The entitlement files (`WikipediaScraperMac.entitlements`, `WikipediaToGEDCOMShareMac.entitlements`, `WikipediaScraperIPad.entitlements`, `WikipediaToGEDCOMShare.entitlements`) define the App Groups and other sandbox capabilities required for the extension to open the app.
+
+The full IPC flow is:
+
+```
+Browser (Safari / Chrome)
+   │  user taps Share button
+   │
+   ▼
+Share Extension (NSExtensionItem with URL attachment)
+   │
+   ├─ extract URL from extensionContext.inputItems
+   │  (try public.url via loadObject; fall back to public.plain-text)
+   │
+   ├─ percent-encode the URL
+   │
+   └─ open "wikipedia-gedcom://add?url=<encoded>"
+          │
+          ▼ macOS: NSWorkspace.shared.open(_:)
+          │ iPadOS: extensionContext?.open(_:) { completeRequest }
+          │
+          ▼
+   Containing App
+          │
+          ├─ macOS: AppDelegate.application(_:open:)
+          │         → URLRouter.shared.route(_:)
+          │         → handler registered by ContentView
+          │         → vm.handleOpenURL(_:)
+          │
+          └─ iPadOS: onOpenURL modifier in iPadContentView
+                    → vm.handleOpenURL(_:)
+                    │
+                    ▼ both platforms
+          vm.addURL(urlString)
+          Task { fetchSingleURL(urlString) }   ← automatic fetch
+```
+
+### 8.2 macOS Share Extension — WikipediaToGEDCOMShareMac
+
+**Directory:** `Sources/WikipediaToGEDCOMShareMac/`
+**Bundle type:** `com.apple.share-services` NSExtension
+
+`ShareViewController` is an `NSViewController` subclass. It shows a small confirmation sheet (360×90 pt) before opening the app, giving the user an explicit Add / Cancel choice.
+
+**UI layout:**
+
+```
+┌─────────────────────────────────────────┐
+│  Add to Wikipedia to GEDCOM             │  ← titleLabel (bold)
+│  https://en.wikipedia.org/wiki/…        │  ← urlLabel (secondary, truncated)
+│                              [Cancel] [Add] │
+└─────────────────────────────────────────┘
+```
+
+**Lifecycle:**
+
+1. `loadView()` — creates a bare `NSView` at 360×90 pt.
+2. `viewDidLoad()` — builds the label stack and button row; calls `extractURL(completion:)`.
+3. `extractURL` — walks `extensionContext.inputItems`, tries `public.url` via `loadObject(ofClass: URL.self)`, falls back to `loadItem(forTypeIdentifier:)` for older macOS compatibility, then tries `public.plain-text`.
+4. On URL resolution, `urlLabel` is updated and `addButton` is enabled.
+5. `didClickAdd()` — encodes the URL and calls `NSWorkspace.shared.open(appURL)`, then calls `extensionContext?.completeRequest(returningItems: nil)`.
+6. `didClickCancel()` — calls `extensionContext?.cancelRequest(withError:)` with `NSUserCancelledError`.
+
+The `Add` button (`\r` key equivalent) is disabled until URL resolution completes, preventing a race where the user clicks before the URL is ready.
+
+The macOS app also exposes an **NSServices entry** via its `Info.plist`. The service is handled by `AppDelegate.addURLFromService(_:userData:error:)`, which reads the URL from the `NSPasteboard` (trying `NSPasteboard.PasteboardType.URL` first, then `.string`) and routes it through the same `wikipedia-gedcom://add?url=…` scheme.
+
+### 8.3 iPadOS Share Extension — WikipediaToGEDCOMShare
+
+**Directory:** `Sources/WikipediaToGEDCOMShare/`
+**Bundle type:** `com.apple.share-services` NSExtension (iOS)
+
+`ShareViewController` is a `UIViewController` subclass. Unlike the macOS extension, it presents no confirmation UI — it acts immediately and dismisses itself.
+
+**Lifecycle:**
+
+1. `viewDidLoad()` — shows a centered spinner and "Adding to Wikipedia to GEDCOM…" label while resolving the URL.
+2. `viewDidAppear(_:)` — calls `extractURL(completion:)`.
+3. On URL resolution, calls `extensionContext?.open(appURL) { _ in completeRequest }`. The `extensionContext.open(_:completionHandler:)` API on iOS both opens the app and dismisses the extension sheet in one step.
+4. If no URL is found, calls `completeRequest(returningItems: nil)` silently.
+
+URL extraction follows the same priority order as the macOS extension: `public.url` via `loadObject`, then `public.plain-text`.
+
+### 8.4 Receiving App Side — handleOpenURL
+
+Both apps route incoming `wikipedia-gedcom://add?url=<encoded>` URLs through a shared `handleOpenURL` method on their respective ViewModels:
+
+```swift
+func handleOpenURL(_ url: URL) {
+    guard url.scheme == "wikipedia-gedcom",
+          url.host == "add",
+          let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let urlParam = components.queryItems?.first(where: { $0.name == "url" })?.value,
+          !urlParam.isEmpty else { return }
+    addURL(urlParam)
+}
+```
+
+`addURL` deduplicates (skips if already in `urls`), appends, and triggers `fetchSingleURL` automatically — so the article begins loading immediately when the URL arrives from the Share Extension.
+
+---
+
+## 9. Key Algorithms
+
+### 9.1 Infobox Extraction
 
 The infobox lives somewhere inside the wikitext as `{{ Infobox royalty | … }}` or similar. Extracting it reliably requires a balanced-brace scan rather than regex, because field values can themselves contain nested templates.
 
@@ -1330,7 +1598,7 @@ For each character:
 
 Once the block is found, fields are extracted with the same technique: split on `|` pipes, but only at `depth == 0` (skipping pipes inside nested templates and wikilinks).
 
-### 8.2 Date Parsing
+### 9.2 Date Parsing
 
 The parser handles three broad categories of Wikipedia date representation:
 
@@ -1356,7 +1624,7 @@ The parser handles three broad categories of Wikipedia date representation:
 - Match tokens against month-name table (January/Jan/JANUARY/1 → 1)
 - Assign remaining numeric tokens: value 1–31 → day; value 1000–2100 → year
 
-### 8.3 GEDCOM Name Construction
+### 9.3 GEDCOM Name Construction
 
 Every person gets one primary `NAME` record derived from the Wikipedia article title (the most authoritative, canonical identifier). Structured name components are attached as subrecords.
 
@@ -1388,7 +1656,7 @@ Additional NAME records:
         2 TYPE aka
 ```
 
-### 8.4 Xref Allocation and Deduplication
+### 9.4 Xref Allocation and Deduplication
 
 All record IDs (`@Ix@`, `@Fx@`, `@Sx@`, `@Ox@`) are allocated from monotonically-increasing integers tracked as `inout` parameters passed through every `BuildContext` initialiser. This ensures uniqueness across the entire output file regardless of how many persons or contexts are processed.
 
@@ -1410,7 +1678,7 @@ Family deduplication uses a canonical key `sorted([husbandID, wifeID]).joined(se
 
 ---
 
-## 9. GEDCOM 7.0 Output Reference
+## 10. GEDCOM 7.0 Output Reference
 
 ### Record structure
 
@@ -1494,7 +1762,7 @@ Splits occur at byte boundaries, never inside a multi-byte UTF-8 sequence.
 
 ---
 
-## 10. Configuration System
+## 11. Configuration System
 
 `ScraperConfig` is loaded once at startup and passed through to `InfoboxParser.parse()`. Fields in the config override or supplement the built-in field mapping tables inside `InfoboxParser`.
 
@@ -1514,7 +1782,62 @@ The case-sensitivity of infobox field keys is normalised to lowercase during ext
 
 ---
 
-## 11. Icon Generation
+## 12. Xcode Projects and Workspace
+
+### Workspace
+
+`WikipediaScraper.xcworkspace` is the top-level entry point for Xcode development. It references both Xcode projects and surfaces them in a single project navigator and scheme selector. Open it with:
+
+```bash
+open WikipediaScraper.xcworkspace
+# or:
+xed WikipediaScraper.xcworkspace
+```
+
+### WikipediaScraperMac.xcodeproj
+
+Contains three targets:
+
+| Target | Type | Contents |
+|--------|------|----------|
+| `WikipediaScraperApp` | macOS Application | SwiftUI macOS app (`WikipediaScraperApp/`, `WikipediaScraperSharedUI/`, `WikipediaScraperCore/`) |
+| `WikipediaToGEDCOMShareMac` | Share Extension | macOS confirmation-sheet Share Extension (`WikipediaToGEDCOMShareMac/`) |
+| `WikipediaScraper` | Command-line tool | CLI tool (`WikipediaScraper/`, `WikipediaScraperCore/`); `swift-argument-parser` as a remote package dependency |
+
+`swift-argument-parser` is declared as a remote package dependency directly in `WikipediaScraperMac.xcodeproj` (not in `Package.swift`), making it available to the CLI target when building via Xcode.
+
+### WikipediaScraperIPad.xcodeproj
+
+Contains two targets:
+
+| Target | Type | Contents |
+|--------|------|----------|
+| `WikipediaScraperIPad` | iOS Application | SwiftUI iPadOS app (`WikipediaScraperIPad/`, `WikipediaScraperSharedUI/`, `WikipediaScraperCore/`) |
+| `WikipediaToGEDCOMShare` | Share Extension | iPadOS immediate-routing Share Extension (`WikipediaToGEDCOMShare/`) |
+
+### Shared schemes
+
+| Project / Workspace | Scheme | Builds |
+|---------------------|--------|--------|
+| `WikipediaScraperMac.xcodeproj` | Wikipedia to GEDCOM (macOS) | macOS app + Share Extension (the extension is embedded in the app bundle automatically) |
+| `WikipediaScraperMac.xcodeproj` | WikipediaScraper CLI | CLI tool only |
+| `WikipediaScraperIPad.xcodeproj` | Wikipedia to GEDCOM (iPadOS) | iPadOS app + Share Extension |
+| `WikipediaScraper.xcworkspace` | Build All | All three top-level app/tool targets |
+
+### Entitlements
+
+Each target that participates in the `wikipedia-gedcom://` URL handshake has its own entitlements file:
+
+| File | Target | Key purpose |
+|------|--------|-------------|
+| `WikipediaScraperMac.entitlements` | macOS app | Outgoing URL scheme, sandboxing, App Groups |
+| `WikipediaToGEDCOMShareMac.entitlements` | macOS Share Extension | `NSExtension`, App Groups |
+| `WikipediaScraperIPad.entitlements` | iPadOS app | URL scheme, App Groups |
+| `WikipediaToGEDCOMShare.entitlements` | iPadOS Share Extension | `NSExtension`, App Groups |
+
+---
+
+## 13. Icon Generation
 
 **File:** `make_icon.swift`
 
