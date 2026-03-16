@@ -8,3 +8,5 @@
 *.gdz
 .DS_Store
 .claude/
+xcuserdata/
+*.xcuserstate
