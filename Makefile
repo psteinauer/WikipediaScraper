@@ -23,7 +23,7 @@ INSTALL_PREFIX  ?= /usr/local/bin
 BUILD_DIR        = ./build
 
 .PHONY: all build release install app app-release ipad ipad-sim ipad-sim-reset \
-        icons clean xcode test
+        icons clean xcode test test-unit
 
 # ── All targets ───────────────────────────────────────────────────────────────
 
@@ -175,6 +175,10 @@ xcode:
 clean:
 	swift package clean
 	rm -rf "$(BUILD_DIR)"
+
+## Run unit tests via Swift Package Manager (fast, no Xcode required)
+test-unit:
+	swift test
 
 ## Smoke-test the CLI against the George Washington Wikipedia article (requires network)
 test:

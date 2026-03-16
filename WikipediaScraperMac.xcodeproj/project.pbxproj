@@ -22,6 +22,16 @@
 		BC000001000000000000001E /* WikipediaScraperCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC000001000000000000001F /* WikipediaScraperCommand.swift */; };
 		BC000001000000000000009E /* WikipediaScraperCore in Frameworks */ = {isa = PBXBuildFile; productRef = BC000001000000000000009F /* WikipediaScraperCore */; };
 		BC00000100000000000000AE /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = BC00000100000000000000AF /* ArgumentParser */; };
+		BD00000100000000000000010E /* DateParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000010F /* DateParserTests.swift */; };
+		BD00000100000000000000011E /* GEDCOMBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000011F /* GEDCOMBuilderTests.swift */; };
+		BD00000100000000000000012E /* GEDZIPBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000012F /* GEDZIPBuilderTests.swift */; };
+		BD00000100000000000000013E /* InfoboxParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000013F /* InfoboxParserTests.swift */; };
+		BD00000100000000000000014E /* IntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000014F /* IntegrationTests.swift */; };
+		BD00000100000000000000015E /* LLMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000015F /* LLMTests.swift */; };
+		BD00000100000000000000016E /* MappingsReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000016F /* MappingsReporterTests.swift */; };
+		BD00000100000000000000017E /* ScraperConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000017F /* ScraperConfigTests.swift */; };
+		BD00000100000000000000018E /* WikipediaClientURLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD00000100000000000000018F /* WikipediaClientURLTests.swift */; };
+		BD00000100000000000000AE /* WikipediaScraperCore in Frameworks (Tests) */ = {isa = PBXBuildFile; productRef = BD00000100000000000000AF /* WikipediaScraperCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +74,16 @@
 		BA000001000000000000011F /* URLRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLRouter.swift; sourceTree = "<group>"; };
 		BC000001000000000000001F /* WikipediaScraperCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaScraperCommand.swift; sourceTree = "<group>"; };
 		BC000001000000000000008F /* WikipediaScraper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WikipediaScraper; sourceTree = BUILT_PRODUCTS_DIR; };
+		BD00000100000000000000010F /* DateParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateParserTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000011F /* GEDCOMBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GEDCOMBuilderTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000012F /* GEDZIPBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GEDZIPBuilderTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000013F /* InfoboxParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoboxParserTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000014F /* IntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000015F /* LLMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000016F /* MappingsReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MappingsReporterTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000017F /* ScraperConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScraperConfigTests.swift; sourceTree = "<group>"; };
+		BD00000100000000000000018F /* WikipediaClientURLTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaClientURLTests.swift; sourceTree = "<group>"; };
+		BD000001000000000000008F /* WikipediaScraperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WikipediaScraperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +112,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BD00000100000000000000B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD00000100000000000000AE /* WikipediaScraperCore in Frameworks (Tests) */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -101,6 +129,7 @@
 				BA00000100000000000000C1 /* Sources/WikipediaScraperApp */,
 				BB00000100000000000000C1 /* Sources/WikipediaToGEDCOMShareMac */,
 				BC00000100000000000000C1 /* Sources/WikipediaScraper */,
+				BD00000100000000000000C1 /* Tests/WikipediaScraperTests */,
 				BA00000100000000000000C2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -127,6 +156,7 @@
 				BA000001000000000000008F /* WikipediaScraperApp.app */,
 				BB000001000000000000008F /* WikipediaToGEDCOMShareMac.appex */,
 				BC000001000000000000008F /* WikipediaScraper */,
+				BD000001000000000000008F /* WikipediaScraperTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -146,6 +176,22 @@
 				BB000001000000000000007F /* Info.plist */,
 			);
 			path = Sources/WikipediaToGEDCOMShareMac;
+			sourceTree = "<group>";
+		};
+		BD00000100000000000000C1 /* Tests/WikipediaScraperTests */ = {
+			isa = PBXGroup;
+			children = (
+				BD00000100000000000000010F /* DateParserTests.swift */,
+				BD00000100000000000000011F /* GEDCOMBuilderTests.swift */,
+				BD00000100000000000000012F /* GEDZIPBuilderTests.swift */,
+				BD00000100000000000000013F /* InfoboxParserTests.swift */,
+				BD00000100000000000000014F /* IntegrationTests.swift */,
+				BD00000100000000000000015F /* LLMTests.swift */,
+				BD00000100000000000000016F /* MappingsReporterTests.swift */,
+				BD00000100000000000000017F /* ScraperConfigTests.swift */,
+				BD00000100000000000000018F /* WikipediaClientURLTests.swift */,
+			);
+			path = Tests/WikipediaScraperTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -213,6 +259,25 @@
 			productReference = BB000001000000000000008F /* WikipediaToGEDCOMShareMac.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BD00000100000000000000D0 /* WikipediaScraperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BD00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaScraperTests" */;
+			buildPhases = (
+				BD00000100000000000000B1 /* Frameworks */,
+				BD00000100000000000000B2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WikipediaScraperTests;
+			packageProductDependencies = (
+				BD00000100000000000000AF /* WikipediaScraperCore */,
+			);
+			productName = WikipediaScraperTests;
+			productReference = BD000001000000000000008F /* WikipediaScraperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -254,6 +319,7 @@
 				BA00000100000000000000D0 /* WikipediaScraperApp */,
 				BB00000100000000000000D0 /* WikipediaToGEDCOMShareMac */,
 				BC00000100000000000000D0 /* WikipediaScraper */,
+				BD00000100000000000000D0 /* WikipediaScraperTests */,
 			);
 		};
 /* End PBXProject section */
@@ -304,6 +370,22 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC000001000000000000001E /* WikipediaScraperCommand.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BD00000100000000000000B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BD00000100000000000000010E /* DateParserTests.swift in Sources */,
+				BD00000100000000000000011E /* GEDCOMBuilderTests.swift in Sources */,
+				BD00000100000000000000012E /* GEDZIPBuilderTests.swift in Sources */,
+				BD00000100000000000000013E /* InfoboxParserTests.swift in Sources */,
+				BD00000100000000000000014E /* IntegrationTests.swift in Sources */,
+				BD00000100000000000000015E /* LLMTests.swift in Sources */,
+				BD00000100000000000000016E /* MappingsReporterTests.swift in Sources */,
+				BD00000100000000000000017E /* ScraperConfigTests.swift in Sources */,
+				BD00000100000000000000018E /* WikipediaClientURLTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -532,6 +614,38 @@
 			};
 			name = Release;
 		};
+		BD00000100000000000000E1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UATYMH5SM8;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaScraperTests;
+				PRODUCT_NAME = WikipediaScraperTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+			};
+			name = Debug;
+		};
+		BD00000100000000000000E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UATYMH5SM8;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaScraperTests;
+				PRODUCT_NAME = WikipediaScraperTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -567,6 +681,15 @@
 			buildConfigurations = (
 				BC00000100000000000000E1 /* Debug */,
 				BC00000100000000000000E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BD00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaScraperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BD00000100000000000000E1 /* Debug */,
+				BD00000100000000000000E2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -611,6 +734,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC00000100000000000000A0 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
 			productName = ArgumentParser;
+		};
+		BD00000100000000000000AF /* WikipediaScraperCore (Tests) */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA00000100000000000000A0 /* XCLocalSwiftPackageReference "." */;
+			productName = WikipediaScraperCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
