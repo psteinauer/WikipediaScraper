@@ -189,6 +189,11 @@ struct ContentView: View {
             aiAnalysisControl
         }
 
+        // Document drag handle
+        ToolbarItem(placement: .automatic) {
+            documentDragHandle
+        }
+
         // Export
         ToolbarItem(placement: .primaryAction) {
             exportMenu
@@ -251,6 +256,23 @@ struct ContentView: View {
             .disabled(!vm.hasData || vm.isLoading)
             .help("Run AI Analysis on fetched articles")
         }
+    }
+
+    // MARK: - Document drag handle
+
+    @ViewBuilder
+    private var documentDragHandle: some View {
+        let tip = vm.documentHasImages
+            ? "Drag to export as GEDZIP (.zip)"
+            : "Drag to export as GEDCOM (.ged) or ZIP"
+        Image(systemName: "arrow.up.doc.fill")
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(vm.hasData ? Color.accentColor : Color.secondary.opacity(0.3))
+            .help(tip)
+            .onDrag {
+                guard vm.hasData else { return NSItemProvider() }
+                return vm.dragItemProviderForDocument()
+            }
     }
 
     // MARK: - Export menu
@@ -382,6 +404,9 @@ struct ContentView: View {
             } icon: {
                 Image(systemName: person.sex == .female ? "person.circle.fill" : "person.circle")
                     .foregroundStyle(Color.accentColor)
+            }
+            .onDrag {
+                vm.dragItemProvider(for: person)
             }
         }
     }

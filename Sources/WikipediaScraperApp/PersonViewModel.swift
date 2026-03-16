@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import WikipediaScraperCore
-import WikipediaScraperSharedUI
+@preconcurrency import WikipediaScraperSharedUI
 
 @MainActor
 final class PersonViewModel: ObservableObject {
@@ -432,6 +432,185 @@ final class PersonViewModel: ObservableObject {
         } catch {
             statusMessage = "Could not open in MacFamilyTree: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Drag support
+
+    /// True if any non-stub person has a primary image or additional media.
+    var documentHasImages: Bool {
+        persons.filter { !$0.isStub }.contains { personHasImages($0) }
+    }
+
+    func personHasImages(_ person: EditablePerson) -> Bool {
+        !person.imageURL.isEmpty || person.additionalMedia.contains { !$0.url.isEmpty }
+    }
+
+    /// Writes all persons as a .ged to a temp file and returns the URL.
+    func buildTempGEDCOM() throws -> URL {
+        var personDatas = persons.filter { !$0.isStub }.map { $0.toPersonData() }
+        if noPeople { personDatas = personDatas.map { var p = $0; stripFamilyRefs(&p); return p } }
+        var builder = GEDCOMBuilder()
+        let gedcom = builder.build(persons: personDatas, verbose: false)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(gedcomFilename)
+        try gedcom.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    /// Writes a single person as a .ged to a temp file and returns the URL.
+    func buildTempGEDCOMForPerson(_ person: EditablePerson) throws -> URL {
+        var data = person.toPersonData()
+        if noPeople { stripFamilyRefs(&data) }
+        var builder = GEDCOMBuilder()
+        let gedcom = builder.build(persons: [data], verbose: false)
+        let name = sanitizeFilename(person.wikiTitle.isEmpty ? "person" : person.wikiTitle)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name + ".ged")
+        try gedcom.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    /// Downloads images and writes all persons as a .zip to a temp file.
+    func buildTempZIP() async throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(exportFilename + ".zip")
+        try await buildAndWriteZip(to: url)
+        return url
+    }
+
+    /// Downloads images for a single person and writes a .zip to a temp file.
+    func buildTempZIPForPerson(_ person: EditablePerson) async throws -> URL {
+        var personData = person.toPersonData()
+        if noPeople { stripFamilyRefs(&personData) }
+        var mediaFiles: [(path: String, data: Data)] = []
+        let prefix = safeBasename(person.wikiTitle, fallback: "person")
+
+        if !person.imageURL.isEmpty {
+            let (data, mime) = try await WikipediaClient.fetchImageData(
+                from: person.imageURL, verbose: false)
+            let relPath = "media/\(prefix).\(mimeExt(mime))"
+            personData.imageFilePath = relPath
+            mediaFiles.append((path: relPath, data: data))
+        }
+        for (j, item) in person.additionalMedia.enumerated() {
+            guard !item.url.isEmpty else { continue }
+            do {
+                let (data, mime) = try await WikipediaClient.fetchImageData(
+                    from: item.url, verbose: false)
+                let relPath = "media/\(prefix)_\(j + 1).\(mimeExt(mime))"
+                personData.additionalMedia[j].filePath = relPath
+                mediaFiles.append((path: relPath, data: data))
+            } catch { /* skip failed images */ }
+        }
+        var builder = GEDCOMBuilder()
+        let gedcom = builder.build(persons: [personData], verbose: false)
+        let name = sanitizeFilename(person.wikiTitle.isEmpty ? "person" : person.wikiTitle)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name + ".zip")
+        try GEDZIPBuilder.create(gedcom: gedcom, mediaFiles: mediaFiles, at: url)
+        return url
+    }
+
+    /// NSItemProvider for dragging the full document.
+    func dragItemProviderForDocument() -> NSItemProvider {
+        let provider    = NSItemProvider()
+        let hasImages   = documentHasImages
+        provider.suggestedName = exportFilename + (hasImages ? ".zip" : ".ged")
+
+        if hasImages {
+            provider.registerFileRepresentation(
+                forTypeIdentifier: UTType.zip.identifier,
+                fileOptions: [], visibility: .all
+            ) { [weak self] completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try await self.buildTempZIP(), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+        } else {
+            // No images — offer .ged (preferred) and .zip as alternative
+            provider.registerFileRepresentation(
+                forTypeIdentifier: "public.data",
+                fileOptions: [], visibility: .all
+            ) { [weak self] completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try self.buildTempGEDCOM(), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+            provider.registerFileRepresentation(
+                forTypeIdentifier: UTType.zip.identifier,
+                fileOptions: [], visibility: .all
+            ) { [weak self] completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try await self.buildTempZIP(), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+        }
+        return provider
+    }
+
+    /// NSItemProvider for dragging a single person.
+    func dragItemProvider(for person: EditablePerson) -> NSItemProvider {
+        let provider  = NSItemProvider()
+        let hasImages = personHasImages(person)
+        let name = sanitizeFilename(person.wikiTitle.isEmpty ? "person" : person.wikiTitle)
+        provider.suggestedName = name + (hasImages ? ".zip" : ".ged")
+
+        if hasImages {
+            provider.registerFileRepresentation(
+                forTypeIdentifier: UTType.zip.identifier,
+                fileOptions: [], visibility: .all
+            ) { [weak self] completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try await self.buildTempZIPForPerson(person), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+        } else {
+            // No images — offer .ged (preferred) and .zip as alternative
+            provider.registerFileRepresentation(
+                forTypeIdentifier: "public.data",
+                fileOptions: [], visibility: .all
+            ) { completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try self.buildTempGEDCOMForPerson(person), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+            provider.registerFileRepresentation(
+                forTypeIdentifier: UTType.zip.identifier,
+                fileOptions: [], visibility: .all
+            ) { [weak self] completion in
+                Task { @MainActor [weak self] in
+                    guard let self else {
+                        completion(nil, false, NSError(domain: "GEDCOMDrag", code: 0)); return
+                    }
+                    do   { completion(try await self.buildTempZIPForPerson(person), false, nil) }
+                    catch { completion(nil, false, error) }
+                }
+                return nil
+            }
+        }
+        return provider
     }
 
     // MARK: - ZIP helper
