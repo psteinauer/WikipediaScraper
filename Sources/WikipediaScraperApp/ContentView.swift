@@ -84,6 +84,8 @@ struct ContentView: View {
                     .navigationTitle(detailTitle)
             }
         }
+        .task { await vm.fetchOnLaunch() }
+        .onAppear { URLRouter.shared.register { url in vm.handleOpenURL(url) } }
         .toolbar { toolbarContent }
         .focusedValue(\.personViewModel, vm)
         .alert("Some Images Could Not Be Loaded", isPresented: Binding(

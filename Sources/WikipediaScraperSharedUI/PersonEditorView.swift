@@ -655,6 +655,25 @@ public struct PersonEditorView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .onChange(of: hasLLMData) { hasData in
+            guard hasData else { return }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if !person.llmAlternateNames.isEmpty {
+                    expandedSections.insert("Additional Names")
+                }
+                if !person.llmEvents.isEmpty {
+                    expandedSections.insert("Events")
+                }
+                if !person.llmTitles.isEmpty || !person.llmFacts.isEmpty {
+                    expandedSections.insert("Facts")
+                    if !person.llmTitles.isEmpty { expandedSections.insert("Facts.Honorifics") }
+                    if !person.llmFacts.isEmpty  { expandedSections.insert("Facts.Custom") }
+                }
+                if !person.influentialPeople.isEmpty {
+                    expandedSections.insert("Other")
+                }
+            }
+        }
     }
 
     // MARK: - Name and Gender

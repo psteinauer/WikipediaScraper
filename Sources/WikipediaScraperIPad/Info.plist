@@ -40,6 +40,17 @@
         <key>UISceneConfigurations</key>
         <dict/>
     </dict>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.psteinauer.WikipediaToGEDCOM.iPad</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>wikipedia-gedcom</string>
+            </array>
+        </dict>
+    </array>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSExceptionDomains</key>

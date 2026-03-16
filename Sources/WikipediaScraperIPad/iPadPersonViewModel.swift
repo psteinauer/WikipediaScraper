@@ -84,9 +84,20 @@ final class iPadPersonViewModel: ObservableObject {
         noPeople     = UserDefaults.standard.bool(forKey: "fetch_no_people")
     }
 
+    func handleOpenURL(_ url: URL) {
+        guard url.scheme == "wikipedia-gedcom",
+              url.host == "add",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let urlParam = components.queryItems?.first(where: { $0.name == "url" })?.value,
+              !urlParam.isEmpty else { return }
+        addURL(urlParam)
+    }
+
     func addURL(_ urlString: String) {
         guard !urls.contains(urlString) else { return }
         urls.append(urlString)
+        guard !isLoading else { return }
+        Task { await fetchSingleURL(urlString) }
     }
 
     func removeURL(_ urlString: String) {
@@ -193,7 +204,7 @@ final class iPadPersonViewModel: ObservableObject {
                 if !pos.successor.isEmpty   { addStub(name: pos.successor) }
             }
             for ip in p.influentialPeople {
-                addStub(name: ip.name, wikiTitle: ip.wikiTitle ?? "")
+                addStub(name: ip.name, wikiTitle: ip.wikiTitle)
             }
         }
 
@@ -207,6 +218,11 @@ final class iPadPersonViewModel: ObservableObject {
     }
 
     // MARK: - Fetch
+
+    func fetchOnLaunch() async {
+        guard !urls.isEmpty, persons.isEmpty else { return }
+        await fetch()
+    }
 
     func fetch() async {
         guard !urls.isEmpty else { return }
@@ -296,6 +312,19 @@ final class iPadPersonViewModel: ObservableObject {
             persons.append(editable)
         }
         selectedPersonID = editable.id
+    }
+
+    private func fetchSingleURL(_ urlString: String) async {
+        errorMessage = nil
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await fetchOne(urlString, index: 0, total: 1)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        statusMessage = nil
+        rebuildStubs()
     }
 
     // MARK: - AI Analysis

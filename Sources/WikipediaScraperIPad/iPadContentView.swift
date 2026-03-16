@@ -70,6 +70,8 @@ struct iPadContentView: View {
                     .toolbar { detailToolbar }
             }
         }
+        .task { await vm.fetchOnLaunch() }
+        .onOpenURL { url in vm.handleOpenURL(url) }
         .toolbar { globalToolbar }
         .sheet(isPresented: $showingSettings) { iPadLLMSettingsView() }
         .sheet(isPresented: $vm.showingAIProgress) {

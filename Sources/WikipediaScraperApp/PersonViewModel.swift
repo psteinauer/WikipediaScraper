@@ -43,13 +43,29 @@ final class PersonViewModel: ObservableObject {
         noPeople     = UserDefaults.standard.bool(forKey: "fetch_no_people")
     }
 
+    func handleOpenURL(_ url: URL) {
+        guard url.scheme == "wikipedia-gedcom",
+              url.host == "add",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let urlParam = components.queryItems?.first(where: { $0.name == "url" })?.value,
+              !urlParam.isEmpty else { return }
+        addURL(urlParam)
+    }
+
     func addURL(_ urlString: String) {
         guard !urls.contains(urlString) else { return }
         urls.append(urlString)
+        guard !isLoading else { return }
+        Task { await fetchSingleURL(urlString) }
     }
 
     func removeURL(_ urlString: String) {
         urls.removeAll { $0 == urlString }
+        persons = []
+        errorMessage = nil
+        statusMessage = nil
+        guard !urls.isEmpty, !isLoading else { return }
+        Task { await fetch() }
     }
 
     var hasData: Bool { persons.contains { !$0.isStub } }
@@ -169,6 +185,11 @@ final class PersonViewModel: ObservableObject {
 
     // MARK: - Fetch
 
+    func fetchOnLaunch() async {
+        guard !urls.isEmpty, persons.isEmpty else { return }
+        await fetch()
+    }
+
     func fetch() async {
         guard !urls.isEmpty else { return }
 
@@ -259,6 +280,21 @@ final class PersonViewModel: ObservableObject {
             persons.append(editable)
         }
         selectedPersonID = editable.id
+    }
+
+    private func fetchSingleURL(_ urlString: String) async {
+        errorMessage = nil
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await fetchOne(urlString, index: 0, total: 1)
+        } catch is CancellationError {
+            // Task was cancelled (e.g. scene lifecycle); nothing to show.
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        statusMessage = nil
+        rebuildStubs()
     }
 
     // MARK: - AI Analysis

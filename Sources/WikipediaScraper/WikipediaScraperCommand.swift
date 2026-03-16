@@ -661,7 +661,7 @@ struct WikipediaScraper: AsyncParsableCommand {
     }
 }
 
-extension Sex: CustomStringConvertible {
+extension Sex: @retroactive CustomStringConvertible {
     public var description: String {
         switch self {
         case .male:    return "Male"
