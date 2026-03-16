@@ -661,12 +661,3 @@ struct WikipediaScraper: AsyncParsableCommand {
     }
 }
 
-extension Sex: @retroactive CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .male:    return "Male"
-        case .female:  return "Female"
-        case .unknown: return "Unknown"
-        }
-    }
-}

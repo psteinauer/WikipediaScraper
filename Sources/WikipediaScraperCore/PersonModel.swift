@@ -119,7 +119,16 @@ public struct SpouseInfo {
 
 // MARK: - Sex
 
-public enum Sex { case male, female, unknown }
+public enum Sex: CustomStringConvertible {
+    case male, female, unknown
+    public var description: String {
+        switch self {
+        case .male:    return "Male"
+        case .female:  return "Female"
+        case .unknown: return "Unknown"
+        }
+    }
+}
 
 // MARK: - Person
 

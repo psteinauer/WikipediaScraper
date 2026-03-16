@@ -27,13 +27,30 @@ BUILD_DIR        = ./build
 
 # ── All targets ───────────────────────────────────────────────────────────────
 
-## Build every target (macOS app + extensions + CLI + iPadOS app) — Debug
+## Build every target (Debug): macOS app + extensions, CLI, iPadOS app + extensions
+##
+## The workspace "Build All" scheme spans macOS and iOS and cannot be built from
+## the command line without a provisioning profile for the iOS targets.  Instead
+## this target sequences three separate invocations — each with the right platform
+## and signing settings — so no developer account or profile is required.
 all:
+	@echo "=== macOS app + Share Extension ==="
 	xcrun xcodebuild \
 	    -workspace "$(WORKSPACE)" \
-	    -scheme "$(BUILD_ALL_SCHEME)" \
+	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Debug \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    build
+	@echo "=== CLI tool ==="
+	swift build --product $(CLI_BINARY)
+	@echo "=== iPadOS app + Share Extension (simulator) ==="
+	xcrun xcodebuild \
+	    -workspace "$(WORKSPACE)" \
+	    -scheme "$(IPAD_SCHEME)" \
+	    -destination "platform=iOS Simulator,name=$(IPAD_SIM_NAME)" \
+	    -configuration Debug \
+	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
 	    build
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
