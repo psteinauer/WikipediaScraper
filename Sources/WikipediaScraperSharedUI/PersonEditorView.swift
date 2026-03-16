@@ -657,20 +657,6 @@ public struct PersonEditorView: View {
         }
     }
 
-    // MARK: - AI Generated label
-
-    private var aiGeneratedLabel: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "wand.and.stars").imageScale(.small)
-            Text("AI Generated")
-        }
-        .font(.caption)
-        .fontWeight(.medium)
-        .foregroundStyle(.secondary)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
-    }
-
     // MARK: - Name and Gender
 
     private var nameAndGenderSection: some View {
@@ -803,20 +789,17 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-            }
-            if !person.llmEvents.isEmpty {
-                Divider()
-                aiGeneratedLabel
                 ForEach(person.llmEvents, id: \.type) { event in
+                    Divider()
                     VStack(alignment: .leading, spacing: 3) {
                         Text(event.type).fontWeight(.medium).font(.subheadline)
-                        if let date  = event.date  { Text(date.gedcom).font(.caption).foregroundStyle(.secondary) }
-                        if let place = event.place { Text(place).font(.caption).foregroundStyle(.secondary) }
-                        if let note  = event.note  { Text(note).font(.caption).foregroundStyle(.tertiary) }
+                            .foregroundStyle(.blue)
+                        if let date  = event.date  { Text(date.gedcom).font(.caption).foregroundStyle(.blue.opacity(0.8)) }
+                        if let place = event.place { Text(place).font(.caption).foregroundStyle(.blue.opacity(0.8)) }
+                        if let note  = event.note  { Text(note).font(.caption).foregroundStyle(.blue.opacity(0.6)) }
                     }
                     .padding(.vertical, 5)
                     .padding(.leading, 22)
-                    Divider().padding(.leading, 22)
                 }
             }
         }
@@ -847,13 +830,15 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-                if !person.llmTitles.isEmpty {
+                ForEach(person.llmTitles, id: \.self) { title in
                     Divider()
-                    aiGeneratedLabel
-                    FieldRow("Additional Titles", showDivider: false) {
-                        Text(person.llmTitles.joined(separator: ", "))
-                            .foregroundStyle(.secondary).textSelection(.enabled)
+                    HStack {
+                        Text(title)
+                            .foregroundStyle(.blue)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .padding(.vertical, 5)
                 }
             }
             Divider()
@@ -878,14 +863,19 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-                if !person.llmFacts.isEmpty {
+                ForEach(person.llmFacts, id: \.type) { fact in
                     Divider()
-                    aiGeneratedLabel
-                    ForEach(person.llmFacts, id: \.type) { fact in
-                        FieldRow(fact.type, showDivider: false) {
-                            Text(fact.value).foregroundStyle(.secondary).textSelection(.enabled)
-                        }
+                    HStack(spacing: 8) {
+                        Text(fact.type)
+                            .font(.caption).foregroundStyle(.blue.opacity(0.8))
+                            .frame(maxWidth: 160, alignment: .leading)
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(fact.value)
+                            .foregroundStyle(.blue)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .padding(.vertical, 5)
                 }
             }
             Divider()
@@ -930,11 +920,11 @@ public struct PersonEditorView: View {
                      showDivider: !person.llmAlternateNames.isEmpty) {
                 TextField("Name at birth (if different)", text: $person.birthName)
             }
-            if !person.llmAlternateNames.isEmpty {
-                aiGeneratedLabel
-                FieldRow("Alternate Names", showDivider: false) {
-                    Text(person.llmAlternateNames.joined(separator: ", "))
-                        .foregroundStyle(.secondary).textSelection(.enabled)
+            ForEach(Array(person.llmAlternateNames.enumerated()), id: \.offset) { index, name in
+                FieldRow("Alt. Name", showDivider: index < person.llmAlternateNames.count - 1) {
+                    Text(name)
+                        .foregroundStyle(.blue)
+                        .textSelection(.enabled)
                 }
             }
         }
@@ -1047,24 +1037,21 @@ public struct PersonEditorView: View {
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
             }
-            if !person.influentialPeople.isEmpty {
+            ForEach(person.influentialPeople, id: \.name) { influentialPerson in
                 Divider()
-                aiGeneratedLabel
-                ForEach(person.influentialPeople, id: \.name) { influentialPerson in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(influentialPerson.name).fontWeight(.medium)
-                            Text("· \(influentialPerson.relationship)")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        if let note = influentialPerson.note {
-                            Text(note).font(.caption).foregroundStyle(.tertiary)
-                        }
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(influentialPerson.name).fontWeight(.medium)
+                            .foregroundStyle(.blue)
+                        Text("· \(influentialPerson.relationship)")
+                            .font(.caption).foregroundStyle(.blue.opacity(0.8))
                     }
-                    .padding(.vertical, 5)
-                    .padding(.leading, 22)
-                    Divider().padding(.leading, 22)
+                    if let note = influentialPerson.note {
+                        Text(note).font(.caption).foregroundStyle(.blue.opacity(0.6))
+                    }
                 }
+                .padding(.vertical, 5)
+                .padding(.leading, 22)
             }
         }
     }
