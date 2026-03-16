@@ -1,0 +1,138 @@
+<svg width="760" height="506" xmlns="http://www.w3.org/2000/svg"
+     font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="760" height="506" fill="#f0eff5"/>
+
+  <!-- Caption -->
+  <text x="380" y="24" text-anchor="middle" font-size="12" fill="#666">
+    Custom Events — standard items (black) and AI-generated items (blue) shown inline and fully editable
+  </text>
+
+  <!-- Events section card -->
+  <rect x="16" y="38" width="728" height="424" rx="10" fill="white" stroke="#dcdce0" stroke-width="1"/>
+
+  <!-- Section header -->
+  <rect x="16" y="38" width="728" height="36" rx="10" fill="white"/>
+  <rect x="16" y="56" width="728" height="18" fill="white"/>
+  <!-- Calendar icon -->
+  <rect x="34" y="49" width="12" height="11" rx="2" fill="none" stroke="#007AFF" stroke-width="1.5"/>
+  <line x1="38" y1="49" x2="38" y2="46" stroke="#007AFF" stroke-width="1.5"/>
+  <line x1="42" y1="49" x2="42" y2="46" stroke="#007AFF" stroke-width="1.5"/>
+  <line x1="34" y1="53" x2="46" y2="53" stroke="#007AFF" stroke-width="1"/>
+  <text x="56" y="63" font-size="13" font-weight="700" fill="#1a1a1a">Events</text>
+  <!-- Down chevron (expanded) -->
+  <polyline points="727,55 732,61 737,55" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="74" x2="744" y2="74" stroke="#ebebef" stroke-width="0.5"/>
+
+  <!-- SubGroup: Custom Events header -->
+  <!-- Down chevron -->
+  <polyline points="32,90 36,96 40,90" fill="none" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Clock icon -->
+  <circle cx="55" cy="93" r="6" fill="none" stroke="#555" stroke-width="1.2"/>
+  <line x1="55" y1="88" x2="55" y2="93" stroke="#555" stroke-width="1.2"/>
+  <line x1="55" y1="93" x2="59" y2="95" stroke="#555" stroke-width="1.2"/>
+  <text x="70" y="98" font-size="12" font-weight="600" fill="#1a1a1a">Custom Events</text>
+  <line x1="30" y1="107" x2="744" y2="107" stroke="#ebebef" stroke-width="0.5"/>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- STANDARD EVENT: Coronation                               -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <text x="170" y="123" text-anchor="end" font-size="11" fill="#888">Event Type</text>
+  <text x="180" y="123" font-size="11" fill="#1a1a1a">Coronation</text>
+  <line x1="174" y1="130" x2="716" y2="130" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="145" text-anchor="end" font-size="11" fill="#888">Date</text>
+  <text x="180" y="145" font-size="11" fill="#1a1a1a">28 JUN 1838</text>
+  <line x1="174" y1="152" x2="716" y2="152" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="167" text-anchor="end" font-size="11" fill="#888">Place</text>
+  <text x="180" y="167" font-size="11" fill="#1a1a1a">Westminster Abbey</text>
+  <line x1="174" y1="174" x2="716" y2="174" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="189" text-anchor="end" font-size="11" fill="#888">Note</text>
+  <text x="180" y="189" font-size="11" fill="#c8c8cc">Additional note</text>
+
+  <!-- Remove button (standard event) -->
+  <circle cx="730" cy="152" r="7" fill="none" stroke="#cc3333" stroke-width="1.2"/>
+  <line x1="726" y1="152" x2="734" y2="152" stroke="#cc3333" stroke-width="1.2"/>
+  <text x="706" y="189" font-size="10" fill="#cc3333">Remove</text>
+
+  <!-- Divider after event -->
+  <line x1="30" y1="200" x2="744" y2="200" stroke="#d4d4d8" stroke-width="1"/>
+
+  <!-- Add Event button -->
+  <circle cx="50" cy="215" r="6" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="50" y1="211" x2="50" y2="219" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="46" y1="215" x2="54" y2="215" stroke="#007AFF" stroke-width="1.2"/>
+  <text x="63" y="219" font-size="11" fill="#007AFF">Add Event</text>
+
+  <!-- Divider before LLM items -->
+  <line x1="30" y1="230" x2="744" y2="230" stroke="#d4d4d8" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- LLM EVENT 1: Accession (blue)                            -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <text x="170" y="246" text-anchor="end" font-size="11" fill="#888">Event Type</text>
+  <text x="180" y="246" font-size="11" fill="#007AFF">Accession</text>
+  <line x1="174" y1="253" x2="716" y2="253" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="268" text-anchor="end" font-size="11" fill="#888">Date</text>
+  <text x="180" y="268" font-size="11" fill="#007AFF">20 JUN 1837</text>
+  <line x1="174" y1="275" x2="716" y2="275" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="290" text-anchor="end" font-size="11" fill="#888">Place</text>
+  <text x="180" y="290" font-size="11" fill="#007AFF">Kensington Palace</text>
+  <line x1="174" y1="297" x2="716" y2="297" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="312" text-anchor="end" font-size="11" fill="#888">Note</text>
+  <text x="180" y="312" font-size="11" fill="#c8c8cc">Additional note</text>
+
+  <!-- Remove button (LLM event 1) -->
+  <circle cx="730" cy="275" r="7" fill="none" stroke="#cc3333" stroke-width="1.2"/>
+  <line x1="726" y1="275" x2="734" y2="275" stroke="#cc3333" stroke-width="1.2"/>
+  <text x="706" y="312" font-size="10" fill="#cc3333">Remove</text>
+
+  <!-- Divider between LLM events -->
+  <line x1="30" y1="322" x2="744" y2="322" stroke="#d4d4d8" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- LLM EVENT 2: Golden Jubilee (blue)                        -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <text x="170" y="338" text-anchor="end" font-size="11" fill="#888">Event Type</text>
+  <text x="180" y="338" font-size="11" fill="#007AFF">Golden Jubilee</text>
+  <line x1="174" y1="345" x2="716" y2="345" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="360" text-anchor="end" font-size="11" fill="#888">Date</text>
+  <text x="180" y="360" font-size="11" fill="#007AFF">20 JUN 1887</text>
+  <line x1="174" y1="367" x2="716" y2="367" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="382" text-anchor="end" font-size="11" fill="#888">Place</text>
+  <text x="180" y="382" font-size="11" fill="#007AFF">Westminster Abbey</text>
+  <line x1="174" y1="389" x2="716" y2="389" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="170" y="404" text-anchor="end" font-size="11" fill="#888">Note</text>
+  <text x="180" y="404" font-size="11" fill="#c8c8cc">Additional note</text>
+
+  <!-- Remove button (LLM event 2) -->
+  <circle cx="730" cy="367" r="7" fill="none" stroke="#cc3333" stroke-width="1.2"/>
+  <line x1="726" y1="367" x2="734" y2="367" stroke="#cc3333" stroke-width="1.2"/>
+  <text x="706" y="404" font-size="10" fill="#cc3333">Remove</text>
+
+  <!-- Bottom card divider -->
+  <line x1="30" y1="416" x2="744" y2="416" stroke="#d4d4d8" stroke-width="0.5"/>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- Legend                                                   -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <rect x="16" y="464" width="14" height="14" rx="3" fill="#444" opacity="0.75"/>
+  <text x="36" y="475" font-size="11" fill="#444">Standard item — parsed from Wikipedia infobox</text>
+
+  <rect x="378" y="464" width="14" height="14" rx="3" fill="#007AFF"/>
+  <text x="398" y="475" font-size="11" fill="#444">AI-generated item — enriched by Claude (editable, blue)</text>
+
+  <!-- Footnote -->
+  <text x="380" y="498" text-anchor="middle" font-size="10" fill="#a0a0a8">
+    Both item types share identical controls — text fields and a Remove button
+  </text>
+</svg>

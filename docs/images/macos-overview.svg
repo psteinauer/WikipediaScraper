@@ -1,0 +1,200 @@
+<svg width="900" height="560" xmlns="http://www.w3.org/2000/svg"
+     font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif">
+
+  <!-- Window -->
+  <rect x="0" y="0" width="900" height="560" rx="12" fill="#f0eff5"/>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="900" height="38" rx="12" fill="#e2e1e7"/>
+  <rect x="0" y="26" width="900" height="12" fill="#e2e1e7"/>
+  <circle cx="24" cy="19" r="6" fill="#ff5f57"/>
+  <circle cx="44" cy="19" r="6" fill="#ffbd2e"/>
+  <circle cx="64" cy="19" r="6" fill="#28c840"/>
+  <text x="450" y="24" text-anchor="middle" font-size="13" font-weight="600" fill="#333">Wikipedia to GEDCOM</text>
+
+  <!-- Toolbar: gear -->
+  <circle cx="810" cy="19" r="7" fill="none" stroke="#555" stroke-width="1.5"/>
+  <circle cx="810" cy="19" r="2.5" fill="#555"/>
+  <!-- Toolbar: Fetch button -->
+  <rect x="826" y="10" width="42" height="18" rx="5" fill="#007AFF"/>
+  <text x="847" y="23" text-anchor="middle" font-size="11" font-weight="600" fill="white">Fetch</text>
+  <!-- Toolbar: Export -->
+  <rect x="874" y="10" width="20" height="18" rx="5" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <polyline points="884,14 884,20" stroke="#007AFF" stroke-width="1.5" stroke-linecap="round"/>
+  <polyline points="880,17 884,13 888,17" fill="none" stroke="#007AFF" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- URL bar -->
+  <rect x="0" y="38" width="900" height="44" fill="white"/>
+  <line x1="0" y1="82" x2="900" y2="82" stroke="#d4d4d8" stroke-width="0.5"/>
+  <!-- Globe icon -->
+  <circle cx="26" cy="60" r="9" fill="none" stroke="#999" stroke-width="1.4"/>
+  <line x1="17" y1="60" x2="35" y2="60" stroke="#999" stroke-width="1"/>
+  <path d="M 26 51 Q 20 60 26 69" fill="none" stroke="#999" stroke-width="1"/>
+  <path d="M 26 51 Q 32 60 26 69" fill="none" stroke="#999" stroke-width="1"/>
+  <!-- Chip 1 -->
+  <rect x="44" y="51" width="138" height="22" rx="11" fill="#ddeeff" stroke="#a8c8f0" stroke-width="1"/>
+  <text x="56" y="65" font-size="11" fill="#1254aa">Queen Victoria</text>
+  <text x="171" y="66" font-size="13" fill="#88aad0">×</text>
+  <!-- Chip 2 -->
+  <rect x="190" y="51" width="112" height="22" rx="11" fill="#ddeeff" stroke="#a8c8f0" stroke-width="1"/>
+  <text x="202" y="65" font-size="11" fill="#1254aa">Prince Albert</text>
+  <text x="291" y="66" font-size="13" fill="#88aad0">×</text>
+  <!-- Add chip -->
+  <rect x="310" y="51" width="70" height="22" rx="11" fill="none" stroke="#c8c8cc" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="345" y="65" text-anchor="middle" font-size="11" fill="#b0b0b8">+ Add</text>
+
+  <!-- Sidebar background -->
+  <rect x="0" y="82" width="232" height="478" fill="#e8e7ed"/>
+  <line x1="232" y1="82" x2="232" y2="560" stroke="#ccccd4" stroke-width="1"/>
+
+  <!-- Fetch Options card -->
+  <rect x="12" y="96" width="208" height="134" rx="8" fill="white" stroke="#d8d8dc" stroke-width="0.5"/>
+  <text x="26" y="114" font-size="11" font-weight="700" fill="#333">Fetch Options</text>
+  <line x1="12" y1="120" x2="220" y2="120" stroke="#ebebef" stroke-width="0.5"/>
+  <!-- Toggle: AI Analysis ON -->
+  <rect x="26" y="128" width="28" height="15" rx="7.5" fill="#007AFF"/>
+  <circle cx="47" cy="135.5" r="5.5" fill="white"/>
+  <text x="60" y="139" font-size="11" fill="#1a1a1a">AI Analysis</text>
+  <!-- Toggle: Notes ON -->
+  <rect x="26" y="149" width="28" height="15" rx="7.5" fill="#007AFF"/>
+  <circle cx="47" cy="156.5" r="5.5" fill="white"/>
+  <text x="60" y="160" font-size="11" fill="#1a1a1a">Notes</text>
+  <!-- Toggle: All Images OFF -->
+  <rect x="26" y="170" width="28" height="15" rx="7.5" fill="#c8c8cc"/>
+  <circle cx="33" cy="177.5" r="5.5" fill="white"/>
+  <text x="60" y="181" font-size="11" fill="#1a1a1a">All Images</text>
+  <!-- Toggle: Main Person Only OFF -->
+  <rect x="26" y="191" width="28" height="15" rx="7.5" fill="#c8c8cc"/>
+  <circle cx="33" cy="198.5" r="5.5" fill="white"/>
+  <text x="60" y="202" font-size="11" fill="#1a1a1a">Main Person Only</text>
+
+  <!-- Segment picker -->
+  <rect x="12" y="240" width="208" height="24" rx="6" fill="#d4d3d9"/>
+  <rect x="14" y="242" width="101" height="20" rx="5" fill="white"/>
+  <text x="64" y="256" text-anchor="middle" font-size="11" font-weight="600" fill="#1a1a1a">People</text>
+  <text x="164" y="256" text-anchor="middle" font-size="11" fill="#888">Sources</text>
+  <line x1="0" y1="270" x2="232" y2="270" stroke="#ccccd4" stroke-width="0.5"/>
+
+  <!-- Selected person row -->
+  <rect x="12" y="278" width="208" height="30" rx="6" fill="#007AFF"/>
+  <circle cx="31" cy="289" r="4" fill="rgba(255,255,255,0.8)"/>
+  <path d="M 22 302 Q 22 296 31 296 Q 40 296 40 302" fill="rgba(255,255,255,0.5)"/>
+  <text x="48" y="297" font-size="11" font-weight="600" fill="white">Queen Victoria</text>
+
+  <!-- Stub person row -->
+  <rect x="12" y="314" width="208" height="30" rx="6" fill="transparent"/>
+  <circle cx="31" cy="325" r="5" fill="none" stroke="#b0b0b8" stroke-width="1.2"/>
+  <line x1="31" y1="321" x2="31" y2="325" stroke="#b0b0b8" stroke-width="1.2"/>
+  <line x1="31" y1="325" x2="34" y2="327" stroke="#b0b0b8" stroke-width="1.2"/>
+  <text x="48" y="333" font-size="11" fill="#a0a0a8">Prince Albert</text>
+  <rect x="168" y="319" width="30" height="14" rx="3" fill="#e8e8ec"/>
+  <text x="183" y="330" text-anchor="middle" font-size="9" fill="#a0a0a8">stub</text>
+
+  <!-- Detail panel background -->
+  <rect x="232" y="82" width="668" height="478" fill="#f0eff5"/>
+
+  <!-- Name and Gender card (expanded) -->
+  <rect x="250" y="96" width="632" height="148" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <!-- Header bg rounded top -->
+  <rect x="250" y="96" width="632" height="30" rx="10" fill="white"/>
+  <rect x="250" y="116" width="632" height="10" fill="white"/>
+  <!-- Person icon (accent) -->
+  <rect x="268" y="104" width="10" height="13" rx="2.5" fill="none" stroke="#007AFF" stroke-width="1.5"/>
+  <circle cx="273" cy="101" r="3.5" fill="none" stroke="#007AFF" stroke-width="1.5"/>
+  <text x="286" y="118" font-size="13" font-weight="700" fill="#1a1a1a">Name and Gender</text>
+  <polyline points="866,108 871,114 876,108" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+  <line x1="250" y1="126" x2="882" y2="126" stroke="#ebebef" stroke-width="0.5"/>
+
+  <!-- Fields -->
+  <text x="384" y="142" text-anchor="end" font-size="11" fill="#888">Wikipedia Title</text>
+  <text x="396" y="142" font-size="11" fill="#aaa">Queen Victoria</text>
+  <line x1="390" y1="148" x2="866" y2="148" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="384" y="163" text-anchor="end" font-size="11" fill="#888">Given Name</text>
+  <text x="396" y="163" font-size="11" fill="#1a1a1a">Victoria</text>
+  <line x1="390" y1="169" x2="866" y2="169" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="384" y="184" text-anchor="end" font-size="11" fill="#888">Surname</text>
+  <text x="396" y="184" font-size="11" fill="#c8c8c8">Family name</text>
+  <line x1="390" y1="190" x2="866" y2="190" stroke="#ebebef" stroke-width="0.5"/>
+
+  <text x="384" y="205" text-anchor="end" font-size="11" fill="#888">Sex</text>
+  <rect x="396" y="195" width="148" height="18" rx="5" fill="#ebebef"/>
+  <rect x="397" y="196" width="47" height="16" rx="4" fill="white"/>
+  <text x="420" y="208" text-anchor="middle" font-size="10" fill="#888">Unknown</text>
+  <text x="472" y="208" text-anchor="middle" font-size="10" fill="#555">Male</text>
+  <text x="517" y="208" text-anchor="middle" font-size="10" fill="#555">Female</text>
+
+  <!-- Portrait thumbnail -->
+  <rect x="856" y="99" width="22" height="28" rx="4" fill="#e0e0e4" stroke="#d0d0d4" stroke-width="0.5"/>
+  <circle cx="867" cy="108" r="4" fill="#c4c4c8"/>
+  <path d="M 860 125 Q 860 117 867 117 Q 874 117 874 125" fill="#c4c4c8"/>
+
+  <!-- Events card (collapsed) -->
+  <rect x="250" y="252" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <rect x="267" y="261" width="12" height="11" rx="2" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="271" y1="261" x2="271" y2="258" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="275" y1="261" x2="275" y2="258" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="267" y1="265" x2="279" y2="265" stroke="#007AFF" stroke-width="0.8"/>
+  <text x="286" y="273" font-size="12" font-weight="700" fill="#1a1a1a">Events</text>
+  <polyline points="872,265 877,269 872,273" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Facts card (collapsed) -->
+  <rect x="250" y="294" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <line x1="267" y1="305" x2="279" y2="305" stroke="#007AFF" stroke-width="1.5"/>
+  <line x1="267" y1="311" x2="279" y2="311" stroke="#007AFF" stroke-width="1.5"/>
+  <line x1="267" y1="317" x2="279" y2="317" stroke="#007AFF" stroke-width="1.5"/>
+  <text x="286" y="315" font-size="12" font-weight="700" fill="#1a1a1a">Facts</text>
+  <polyline points="872,307 877,311 872,315" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Additional Names card (collapsed) -->
+  <rect x="250" y="336" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <circle cx="273" cy="350" r="5" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="273" y1="346" x2="273" y2="354" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="269" y1="350" x2="277" y2="350" stroke="#007AFF" stroke-width="1.2"/>
+  <text x="286" y="357" font-size="12" font-weight="700" fill="#1a1a1a">Additional Names</text>
+  <polyline points="872,349 877,353 872,357" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Media card (collapsed) -->
+  <rect x="250" y="378" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <rect x="267" y="384" width="14" height="11" rx="2" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <circle cx="271" cy="388" r="1.5" fill="#007AFF"/>
+  <polyline points="267,394 271,389 275,392 279,386 281,394" fill="none" stroke="#007AFF" stroke-width="1"/>
+  <text x="286" y="399" font-size="12" font-weight="700" fill="#1a1a1a">Media</text>
+  <polyline points="872,391 877,395 872,399" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Notes card (collapsed) -->
+  <rect x="250" y="420" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <path d="M 267 427 L 275 427 L 279 431 L 279 453 L 267 453 Z" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <polyline points="275,427 275,431 279,431" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <line x1="270" y1="435" x2="276" y2="435" stroke="#007AFF" stroke-width="0.8"/>
+  <line x1="270" y1="438" x2="276" y2="438" stroke="#007AFF" stroke-width="0.8"/>
+  <text x="286" y="441" font-size="12" font-weight="700" fill="#1a1a1a">Notes</text>
+  <polyline points="872,433 877,437 872,441" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Sources card (collapsed) -->
+  <rect x="250" y="462" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <path d="M 267 469 L 273 469 L 277 473 L 277 482 L 267 482 Z" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <polyline points="273,469 273,473 277,473" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <!-- gear badge -->
+  <circle cx="279" cy="479" r="4" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <circle cx="279" cy="479" r="1.5" fill="#007AFF"/>
+  <text x="286" y="483" font-size="12" font-weight="700" fill="#1a1a1a">Sources</text>
+  <polyline points="872,475 877,479 872,483" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Other card (collapsed) - partial, hinting at more content -->
+  <rect x="250" y="504" width="632" height="34" rx="10" fill="white" stroke="#dcdce0" stroke-width="0.5"/>
+  <circle cx="271" cy="517" r="4" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <circle cx="277" cy="517" r="4" fill="none" stroke="#007AFF" stroke-width="1.2"/>
+  <text x="286" y="525" font-size="12" font-weight="700" fill="#1a1a1a">Other</text>
+  <polyline points="872,517 877,521 872,525" fill="none" stroke="#c0c0c8" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Scroll fade at bottom -->
+  <defs>
+    <linearGradient id="fadeBottom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0eff5" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#f0eff5" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <rect x="232" y="520" width="668" height="40" fill="url(#fadeBottom)"/>
+</svg>

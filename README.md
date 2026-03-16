@@ -39,6 +39,8 @@ Double-click the app in Finder or Launchpad to open it. On first launch macOS ma
    - **Open in MacFamilyTree 11** — exports a ZIP and opens it directly in MacFamilyTree.
    - **View GEDCOM…** — previews the raw GEDCOM text in a scrollable sheet with copy and save options.
 
+![macOS app — URL bar, sidebar with fetch options and people list, person editor](docs/images/macos-overview.svg)
+
 ### Settings
 
 Click the **gear icon** (or wand icon when AI Analysis is enabled) in the toolbar to open the settings popover. This is where you configure the **Claude AI API key**. The fetch options (Notes, All Images, Main Person Only) are always visible in the sidebar.
@@ -50,13 +52,17 @@ The detail panel shows the selected person's data organised into eight collapsib
 | Section | Contents |
 |---------|----------|
 | **Name and Gender** | Wikipedia title (read-only), given name, surname, sex. The person's primary image appears to the right of this card when available. |
-| **Events** | Birth, Death, Burial, Baptism (date/place/note/cause); Spouses (name, marriage date/place, divorce date); Titled Positions; Custom Events |
-| **Facts** | Honorifics; Custom facts (type + value); Occupations; Attributes |
-| **Additional Names** | Birth name, alternate names, AI-generated alternate names and titles |
+| **Events** | Birth, Death, Burial, Baptism (date/place/note/cause); Spouses; Titled Positions; Custom Events. **AI-generated events appear inline in blue** — same edit controls as standard events. |
+| **Facts** | Honorifics; Custom facts (type + value); Occupations; Attributes (nationality, religion). **AI-generated titles and facts appear inline in blue.** |
+| **Additional Names** | Birth name. **AI-generated alternate names appear inline in blue**, each individually editable. |
 | **Media** | Primary image URL with live preview; additional media items with captions |
 | **Notes** | Wikipedia article sections (populated when Notes is enabled) |
-| **Sources** | Wikipedia article citation; AI Analysis citation |
-| **Other** | Parents (father, mother); Children |
+| **Sources** | Wikipedia article citation; AI Analysis citation (shown when AI Analysis has run) |
+| **Other** | Parents (father, mother); Children. **AI-identified influential people appear inline in blue** with name, relationship, and note fields. |
+
+When **AI Analysis** is enabled, all Claude-enriched items are integrated directly into the relevant sections and shown in **blue text** to distinguish them from infobox-parsed data. They are fully editable and deletable — identical in behaviour to standard items.
+
+![Person editor — AI-generated items shown inline in blue alongside standard items](docs/images/person-editor-llm.svg)
 
 **Expand and collapse shortcuts:**
 
@@ -220,7 +226,7 @@ An internet connection is required to fetch Wikipedia articles and images.
 - Persons referenced by multiple input URLs are **deduplicated** — one INDI record, one FAM record, shared across all contexts
 - Downloads portrait images from Wikimedia and packages them into a **GEDZIP archive**
 - Optionally downloads **every article image** into the archive (`--allimages` / All Images option)
-- **AI Analysis** via Claude API (Anthropic) — enriches each article with alternate names, titles, facts, events, and influential people; results stored separately in the GEDCOM and cited as "Claude AI (Anthropic)"
+- **AI Analysis** via Claude API (Anthropic) — enriches each article with alternate names, titles, facts, events, and influential people; results appear **inline in blue** within the relevant editor sections and are stored separately in the GEDCOM output cited as "Claude AI (Anthropic)"
 - **MacFamilyTree 11 integration** (macOS app) — one-click export and open
 - **GEDCOM preview** (macOS app) — scrollable, selectable, monospace view of the raw GEDCOM output with copy and save options
 - Emits titled positions (reign, office) as **GEDCOM EVEN with TYPE "Nobility title"**

@@ -576,29 +576,33 @@ EditablePerson
 ├── titledPositions : [EditableTitledPosition]
 │       └── title / startDate / endDate / place / predecessor / successor / note
 ├── customEvents : [EditableCustomEvent]
-│       └── type (editable) / date / place / note
+│       └── id: UUID / type / date / place / note
 ├── personFacts : [EditablePersonFact]
-│       └── type (editable) / value
+│       └── id: UUID / type / value
 ├── honorifics  : [String]
 ├── spouses     : [EditableSpouse]
 │       └── name / marriageDate / marriagePlace / divorceDate
 ├── children    : [EditablePersonRef]
+│       └── id: UUID / name
 ├── father / mother : String
 ├── occupations : [String]
 ├── nationality / religion : String
 ├── imageURL : String                       ← primary image URL
 ├── additionalMedia : [EditableMediaItem]
-│       └── url (String) / caption (String)
+│       └── id: UUID / url (String) / caption (String)
 │
-├── LLM-enriched fields (populated by LLMClient.analyze)
+├── LLM-enriched fields (populated by LLMClient.analyze — displayed inline
+│   in blue within their respective sections; fully editable and deletable)
 │   ├── llmAlternateNames : [String]
 │   ├── llmTitles         : [String]
 │   ├── llmFacts          : [EditablePersonFact]
+│   │       └── id: UUID / type / value
 │   ├── llmEvents         : [EditableCustomEvent]
-│   └── influentialPeople : [InfluentialPerson]
-│           └── name / wikiTitle / relationship / note
+│   │       └── id: UUID / type / date / place / note
+│   └── influentialPeople : [EditableInfluentialPerson]
+│           └── id: UUID / name / wikiTitle / relationship / note
 │
-└── wikiTitle / wikiURL / wikiExtract / wikiSections   ← metadata
+└── wikiTitle / wikiURL / wikiExtract / wikiSections   ← metadata (read-only)
 ```
 
 Each editable type provides:
@@ -607,6 +611,8 @@ Each editable type provides:
 - `toXxx() -> PersonModelType` — convert back for export; dates re-parsed via `DateParser.parse()`.
 
 `EditablePerson.toPersonData()` assigns each property individually on a blank `PersonData()` (the memberwise init is `internal` in the Core module and not accessible here).
+
+`EditableInfluentialPerson` is the editable counterpart of `InfluentialPerson`. `PersonViewModel` maps LLM analysis results to these Editable types on assignment so the view can bind to them immediately.
 
 ### 4.2 PersonEditorView
 
@@ -640,16 +646,20 @@ This avoids the Swift compile error about storing a non-escaping `@ViewBuilder` 
 
 #### Sections in order
 
-| Section key | SF Symbol | Contents |
-|-------------|-----------|---------|
-| `"Name and Gender"` | `person.text.rectangle` | Given name, surname, birth name, sex picker; primary image shown to the right (fit-to-height, aspect-preserving) when image URL is set |
-| `"Media"` | `photo.stack` | Horizontally-scrolling thumbnail grid — primary image cell (star badge, edit popover), additional media cells with caption overlay; add button |
-| `"Events"` | `calendar` | Birth, Death, Burial, Baptism sub-groups; Spouses, Titled Positions, Custom Events sub-groups |
-| `"Facts"` | `list.bullet.rectangle` | Honorifics, Occupations, Custom Facts sub-groups |
-| `"Attributes"` | `tag` | Nationality, religion |
-| `"Other"` | `person.2` | Father, mother, children |
-| `"AI Analysis"` | `wand.and.stars` | LLM alternate names, additional titles, facts, events, influential people (read-only display) |
-| `"Sources"` | `doc.text.magnifyingglass` | Wikipedia extract, article URL |
+The eight top-level sections correspond to the keys in `PersonEditorView.topLevelSections` and are rendered in this order:
+
+| Section key | SF Symbol | Sub-sections / Contents |
+|-------------|-----------|------------------------|
+| `"Name and Gender"` | `person.text.rectangle` | Wikipedia title (read-only), given name, surname, sex picker; primary image shown to the right when the image URL is set |
+| `"Events"` | `calendar.badge.clock` | Sub-groups: Birth, Death, Burial, Baptism (`EventSectionContent`), Spouses, Titled Positions, Custom Events. `llmEvents` (AI-generated) appear at the end of the Custom Events sub-group in **blue text**, editable and deletable. |
+| `"Facts"` | `list.bullet` | Sub-groups: Honorifics & Titles, Custom Facts, Occupations, Attributes (nationality/religion). `llmTitles` appear at the end of Honorifics, `llmFacts` at the end of Custom Facts — both in **blue text**. |
+| `"Additional Names"` | `person.badge.plus` | Birth name text field. `llmAlternateNames` appear below birth name as individual editable rows in **blue text**. |
+| `"Media"` | `photo` | Thumbnail grid — primary image cell (star badge, popover), additional media cells (caption overlay); Add Image button |
+| `"Notes"` | `doc.text` | Read-only display of `wikiSections` (Wikipedia article sections, populated with Notes enabled). Hidden when empty. |
+| `"Sources"` | `doc.badge.gearshape` | Wikipedia article link + "Claude AI (Anthropic)" row when `hasLLMData` is true |
+| `"Other"` | `ellipsis.circle` | Sub-groups: Parents (father/mother), Children. `influentialPeople` (AI-generated) appear after the Children sub-group in **blue text** with name, relationship, and note fields. |
+
+LLM-enriched items in every section use identical `FieldRow` / `TextField` layout to standard items. They are distinguished solely by `.foregroundStyle(.blue)` on the text field content. All have a Remove button that mutates the corresponding `llmXxx` or `influentialPeople` array on `EditablePerson`.
 
 #### Expand / collapse behaviour
 
@@ -948,8 +958,10 @@ PersonViewModel.fetch()   (loops over all URLs)
         │
         └─ (if LLMSettings.shared.isEnabled)
               LLMClient.analyze(pageTitle:wikitext:extract:apiKey:onProgress:)
+              → [PersonFact] / [CustomEvent] / [InfluentialPerson] mapped to Editable types
               → editable.llmAlternateNames / llmTitles / llmFacts / llmEvents / influentialPeople
               → AIProgressSheet streams live messages
+              → items appear inline in blue within their respective editor sections
         │
         ├─ upsert into vm.persons (replace stub/existing by wikiTitle, else append)
         └─ vm.selectedPersonID = editable.id
@@ -1011,7 +1023,7 @@ func selectedPersonBinding() -> Binding<EditablePerson>?
 
 #### `rebuildStubs()`
 
-Called after every fetch and whenever `noPeople` changes. When `noPeople == false`, extracts all referenced names (spouses, children, father, mother, titledPositions predecessors/successors, influentialPeople) from full (non-stub) persons and creates minimal `EditablePerson` stubs for any not already present in `persons`. When `noPeople == true`, removes all stubs.
+Called after every fetch and whenever `noPeople` changes. When `noPeople == false`, extracts all referenced names (spouses, children, father, mother, titledPositions predecessors/successors, and `influentialPeople.wikiTitle`) from full (non-stub) persons and creates minimal `EditablePerson` stubs for any not already present in `persons`. When `noPeople == true`, removes all stubs. Note: `influentialPeople` is now `[EditableInfluentialPerson]`, so `wikiTitle` is a plain `String` (not `String?`).
 
 #### Export workflows
 
