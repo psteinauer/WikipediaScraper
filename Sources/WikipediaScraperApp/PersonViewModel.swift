@@ -151,7 +151,7 @@ final class PersonViewModel: ObservableObject {
                 if !pos.successor.isEmpty   { addStub(name: pos.successor) }
             }
             for ip in p.influentialPeople {
-                addStub(name: ip.name, wikiTitle: ip.wikiTitle ?? "")
+                addStub(name: ip.name, wikiTitle: ip.wikiTitle)
             }
         }
 
@@ -277,9 +277,9 @@ final class PersonViewModel: ObservableObject {
                         })
                     editable.llmAlternateNames = analysis.alternateNames
                     editable.llmTitles         = analysis.additionalTitles
-                    editable.llmFacts          = analysis.additionalFacts
-                    editable.llmEvents         = analysis.additionalEvents
-                    editable.influentialPeople = analysis.influentialPeople
+                    editable.llmFacts          = analysis.additionalFacts.map          { EditablePersonFact(from: $0) }
+                    editable.llmEvents         = analysis.additionalEvents.map         { EditableCustomEvent(from: $0) }
+                    editable.influentialPeople = analysis.influentialPeople.map        { EditableInfluentialPerson(from: $0) }
                     aiProgressEntries[entryIdx].isDone = true
                 } catch {
                     aiProgressEntries[entryIdx].steps.append("Error: \(error.localizedDescription)")

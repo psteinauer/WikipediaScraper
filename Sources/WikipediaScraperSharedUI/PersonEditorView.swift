@@ -789,17 +789,23 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-                ForEach(person.llmEvents, id: \.type) { event in
-                    Divider()
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(event.type).fontWeight(.medium).font(.subheadline)
-                            .foregroundStyle(.blue)
-                        if let date  = event.date  { Text(date.gedcom).font(.caption).foregroundStyle(.blue.opacity(0.8)) }
-                        if let place = event.place { Text(place).font(.caption).foregroundStyle(.blue.opacity(0.8)) }
-                        if let note  = event.note  { Text(note).font(.caption).foregroundStyle(.blue.opacity(0.6)) }
+                ForEach($person.llmEvents) { $event in
+                    FieldRow("Event Type") { TextField("e.g. Coronation, Inauguration", text: $event.type).foregroundStyle(.blue) }
+                    FieldRow("Date")       { TextField("e.g. 28 JUN 1838",              text: $event.date).foregroundStyle(.blue) }
+                    FieldRow("Place")      { TextField("Place",                          text: $event.place).foregroundStyle(.blue) }
+                    FieldRow("Note")       { TextField("Note",                           text: $event.note).foregroundStyle(.blue) }
+                    HStack {
+                        Spacer()
+                        Button(role: .destructive) {
+                            person.llmEvents.removeAll { $0.id == event.id }
+                        } label: {
+                            Label("Remove", systemImage: "minus.circle")
+                                .font(.caption).foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
-                    .padding(.vertical, 5)
-                    .padding(.leading, 22)
+                    .padding(.bottom, 4)
+                    Divider()
                 }
             }
         }
@@ -830,15 +836,19 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-                ForEach(person.llmTitles, id: \.self) { title in
-                    Divider()
+                ForEach(person.llmTitles.indices, id: \.self) { index in
                     HStack {
-                        Text(title)
+                        TextField("e.g. Sir, The Right Honourable",
+                                  text: $person.llmTitles[index])
+                            .textFieldStyle(.plain)
                             .foregroundStyle(.blue)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button { person.llmTitles.remove(at: index) } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
                     .padding(.vertical, 5)
+                    Divider()
                 }
             }
             Divider()
@@ -863,19 +873,22 @@ public struct PersonEditorView: View {
                 }
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
-                ForEach(person.llmFacts, id: \.type) { fact in
-                    Divider()
+                ForEach($person.llmFacts) { $fact in
                     HStack(spacing: 8) {
-                        Text(fact.type)
-                            .font(.caption).foregroundStyle(.blue.opacity(0.8))
-                            .frame(maxWidth: 160, alignment: .leading)
-                        Text("·").foregroundStyle(.tertiary)
-                        Text(fact.value)
+                        TextField("Type (e.g. House, Award)", text: $fact.type)
+                            .textFieldStyle(.plain).frame(maxWidth: 160)
                             .foregroundStyle(.blue)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("·").foregroundStyle(.tertiary)
+                        TextField("Value", text: $fact.value)
+                            .textFieldStyle(.plain)
+                            .foregroundStyle(.blue)
+                        Button { person.llmFacts.removeAll { $0.id == fact.id } } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
                     .padding(.vertical, 5)
+                    Divider()
                 }
             }
             Divider()
@@ -920,11 +933,16 @@ public struct PersonEditorView: View {
                      showDivider: !person.llmAlternateNames.isEmpty) {
                 TextField("Name at birth (if different)", text: $person.birthName)
             }
-            ForEach(Array(person.llmAlternateNames.enumerated()), id: \.offset) { index, name in
-                FieldRow("Alt. Name", showDivider: index < person.llmAlternateNames.count - 1) {
-                    Text(name)
-                        .foregroundStyle(.blue)
-                        .textSelection(.enabled)
+            ForEach(person.llmAlternateNames.indices, id: \.self) { index in
+                FieldRow("Alt. Name") {
+                    HStack {
+                        TextField("Alternate name", text: $person.llmAlternateNames[index])
+                            .foregroundStyle(.blue)
+                        Button { person.llmAlternateNames.remove(at: index) } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    }
                 }
             }
         }
@@ -1037,21 +1055,22 @@ public struct PersonEditorView: View {
                 .buttonStyle(.borderless)
                 .padding(.top, 4)
             }
-            ForEach(person.influentialPeople, id: \.name) { influentialPerson in
+            ForEach($person.influentialPeople) { $p in
                 Divider()
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack {
-                        Text(influentialPerson.name).fontWeight(.medium)
-                            .foregroundStyle(.blue)
-                        Text("· \(influentialPerson.relationship)")
-                            .font(.caption).foregroundStyle(.blue.opacity(0.8))
+                FieldRow("Name")         { TextField("Full name",           text: $p.name).foregroundStyle(.blue) }
+                FieldRow("Relationship") { TextField("e.g. Mentor, Rival",  text: $p.relationship).foregroundStyle(.blue) }
+                FieldRow("Note")         { TextField("Brief note",          text: $p.note).foregroundStyle(.blue) }
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        person.influentialPeople.removeAll { $0.id == p.id }
+                    } label: {
+                        Label("Remove", systemImage: "minus.circle")
+                            .font(.caption).foregroundStyle(.red)
                     }
-                    if let note = influentialPerson.note {
-                        Text(note).font(.caption).foregroundStyle(.blue.opacity(0.6))
-                    }
+                    .buttonStyle(.borderless)
                 }
-                .padding(.vertical, 5)
-                .padding(.leading, 22)
+                .padding(.bottom, 4)
             }
         }
     }

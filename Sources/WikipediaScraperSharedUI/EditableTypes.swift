@@ -162,6 +162,32 @@ public struct EditablePersonRef: Identifiable {
     public init(from ref: PersonRef) { self.name = ref.name }
 }
 
+// MARK: - EditableInfluentialPerson
+
+public struct EditableInfluentialPerson: Identifiable {
+    public var id = UUID()
+    public var name:         String = ""
+    public var wikiTitle:    String = ""
+    public var relationship: String = ""
+    public var note:         String = ""
+
+    public func toInfluentialPerson() -> InfluentialPerson {
+        InfluentialPerson(name: name,
+                          wikiTitle: wikiTitle.isEmpty ? nil : wikiTitle,
+                          relationship: relationship,
+                          note: note.isEmpty ? nil : note)
+    }
+
+    public init() {}
+
+    public init(from p: InfluentialPerson) {
+        self.name         = p.name
+        self.wikiTitle    = p.wikiTitle ?? ""
+        self.relationship = p.relationship
+        self.note         = p.note ?? ""
+    }
+}
+
 // MARK: - EditableMediaItem
 
 public struct EditableMediaItem: Identifiable {
@@ -225,15 +251,13 @@ public struct EditablePerson: Identifiable {
     public var wikiURL:     String = ""
     public var wikiExtract: String = ""
 
-    // ── Pass-through: notes and LLM enrichment (not user-editable) ────────
-    // These are populated by --notes / --llm during fetch and forwarded
-    // unchanged into PersonData when building the GEDCOM.
-    public var wikiSections:      [(title: String, text: String)] = []
-    public var llmAlternateNames: [String]            = []
-    public var llmTitles:         [String]             = []
-    public var llmFacts:          [PersonFact]         = []
-    public var llmEvents:         [CustomEvent]        = []
-    public var influentialPeople: [InfluentialPerson]  = []
+    // ── Notes and LLM enrichment (--notes / --llm) ────────────────────────
+    public var wikiSections:      [(title: String, text: String)]  = []
+    public var llmAlternateNames: [String]                         = []
+    public var llmTitles:         [String]                         = []
+    public var llmFacts:          [EditablePersonFact]             = []
+    public var llmEvents:         [EditableCustomEvent]            = []
+    public var influentialPeople: [EditableInfluentialPerson]      = []
 
     public init() {}
 
@@ -270,9 +294,9 @@ public struct EditablePerson: Identifiable {
         self.wikiSections      = p.wikiSections
         self.llmAlternateNames = p.llmAlternateNames
         self.llmTitles         = p.llmTitles
-        self.llmFacts          = p.llmFacts
-        self.llmEvents         = p.llmEvents
-        self.influentialPeople = p.influentialPeople
+        self.llmFacts          = p.llmFacts.map          { EditablePersonFact(from: $0) }
+        self.llmEvents         = p.llmEvents.map         { EditableCustomEvent(from: $0) }
+        self.influentialPeople = p.influentialPeople.map { EditableInfluentialPerson(from: $0) }
     }
 
     public func toPersonData() -> PersonData {
@@ -313,9 +337,9 @@ public struct EditablePerson: Identifiable {
         p.wikiSections      = wikiSections
         p.llmAlternateNames = llmAlternateNames
         p.llmTitles         = llmTitles
-        p.llmFacts          = llmFacts
-        p.llmEvents         = llmEvents
-        p.influentialPeople = influentialPeople
+        p.llmFacts          = llmFacts.map          { $0.toPersonFact() }
+        p.llmEvents         = llmEvents.map         { $0.toCustomEvent() }
+        p.influentialPeople = influentialPeople.map { $0.toInfluentialPerson() }
         return p
     }
 }
