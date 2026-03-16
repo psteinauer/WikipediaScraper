@@ -168,12 +168,10 @@ struct ContentView: View {
             Button {
                 showingSettings.toggle()
             } label: {
-                Image(systemName: LLMSettings.shared.isEnabled ? "wand.and.stars" : "gearshape")
+                Image(systemName: "gearshape")
                     .symbolRenderingMode(.hierarchical)
             }
-            .help(LLMSettings.shared.isEnabled
-                  ? "AI Analysis is enabled — click to configure"
-                  : "Settings")
+            .help("Settings")
             .popover(isPresented: $showingSettings, arrowEdge: .top) {
                 LLMSettingsView()
             }
@@ -182,6 +180,11 @@ struct ContentView: View {
         // Fetch / status indicator
         ToolbarItem(placement: .automatic) {
             fetchControl
+        }
+
+        // AI Analysis
+        ToolbarItem(placement: .automatic) {
+            aiAnalysisControl
         }
 
         // Export
@@ -217,6 +220,34 @@ struct ContentView: View {
             .disabled(vm.urls.isEmpty)
             .keyboardShortcut(.return, modifiers: .command)
             .help("Fetch Wikipedia articles (⌘↩)")
+        }
+    }
+
+    // MARK: - AI Analysis control
+
+    @ViewBuilder
+    private var aiAnalysisControl: some View {
+        if vm.isAnalyzing {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                if let status = vm.statusMessage {
+                    Text(status)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .transition(.opacity.animation(.easeOut))
+                }
+            }
+        } else {
+            Button {
+                Task { await vm.analyzeWithLLM() }
+            } label: {
+                Image(systemName: "wand.and.stars")
+                    .foregroundStyle(vm.hasData ? Color.accentColor : Color.secondary.opacity(0.3))
+            }
+            .buttonStyle(.borderless)
+            .disabled(!vm.hasData || vm.isLoading)
+            .help("Run AI Analysis on fetched articles")
         }
     }
 

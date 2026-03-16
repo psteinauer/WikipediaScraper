@@ -12,21 +12,18 @@ private struct iPadLLMSettingsView: View {
         NavigationStack {
             Form {
                 Section {
-                    Toggle("Enable AI Analysis", isOn: $llm.isEnabled)
-                    if llm.isEnabled {
-                        LabeledContent("API Key") {
-                            SecureField("sk-ant-…", text: $llm.apiKey)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.asciiCapable)
-                        }
+                    LabeledContent("API Key") {
+                        SecureField("sk-ant-…", text: $llm.apiKey)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.asciiCapable)
                     }
                 } header: {
                     Label("Claude AI (Anthropic)", systemImage: "wand.and.stars")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("When enabled, Claude AI analyses each article to extract alternate names, titles, facts, events, and influential people. Results are stored separately in the GEDCOM and cited as \u{201C}Claude AI (Anthropic)\u{201D}.")
-                        if llm.isEnabled && llm.apiKey.isEmpty {
+                        Text("Use the \u{201C}wand\u{201D} toolbar button to run AI Analysis on fetched articles. Results are stored separately in the GEDCOM and cited as \u{201C}Claude AI (Anthropic)\u{201D}.")
+                        if llm.apiKey.isEmpty {
                             Label("An Anthropic API key is required.", systemImage: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                                 .padding(.top, 2)
@@ -367,7 +364,20 @@ struct iPadContentView: View {
     private var globalToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
             Button { showingSettings = true } label: {
-                Image(systemName: LLMSettings.shared.isEnabled ? "wand.and.stars" : "gearshape")
+                Image(systemName: "gearshape")
+            }
+        }
+        ToolbarItem(placement: .navigationBarLeading) {
+            if vm.isAnalyzing {
+                ProgressView().controlSize(.small)
+            } else {
+                Button {
+                    Task { await vm.analyzeWithLLM() }
+                } label: {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundStyle(vm.hasData ? Color.accentColor : Color.secondary.opacity(0.3))
+                }
+                .disabled(!vm.hasData || vm.isLoading)
             }
         }
     }

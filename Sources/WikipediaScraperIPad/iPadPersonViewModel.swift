@@ -55,6 +55,7 @@ final class iPadPersonViewModel: ObservableObject {
     @Published var mediaWarnings: [String] = []
     @Published var aiProgressEntries: [AIProgressEntry] = []
     @Published var showingAIProgress: Bool = false
+    @Published var isAnalyzing: Bool = false
 
     // Export state
     @Published var gedDocument  = GEDCOMDocument()
@@ -285,47 +286,6 @@ final class iPadPersonViewModel: ObservableObject {
             } catch { /* non-fatal */ }
         }
 
-        // ── LLM enrichment ─────────────────────────────────────────────────
-        let llm = LLMSettings.shared
-        if llm.isEnabled {
-            let key = llm.apiKey.isEmpty
-                ? (ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "")
-                : llm.apiKey
-            if key.isEmpty {
-                errorMessage = "AI Analysis requires an Anthropic API key. Set it in Settings."
-            } else {
-                statusMessage = multi ? "Running AI analysis (\(index + 1)/\(total))…" : "Running AI analysis…"
-
-                // Open progress sheet and register this article
-                let entryIdx = aiProgressEntries.count
-                aiProgressEntries.append(AIProgressEntry(title: pageTitle))
-                showingAIProgress = true
-
-                do {
-                    let analysis = try await LLMClient.analyze(
-                        pageTitle:  pageTitle,
-                        wikitext:   wikitext,
-                        extract:    summary.extract,
-                        apiKey:     key,
-                        verbose:    false,
-                        onProgress: { [weak self] message in
-                            guard let self else { return }
-                            self.aiProgressEntries[entryIdx].steps.append(message)
-                        })
-                    editable.llmAlternateNames = analysis.alternateNames
-                    editable.llmTitles         = analysis.additionalTitles
-                    editable.llmFacts          = analysis.additionalFacts
-                    editable.llmEvents         = analysis.additionalEvents
-                    editable.influentialPeople = analysis.influentialPeople
-                    aiProgressEntries[entryIdx].isDone = true
-                } catch {
-                    aiProgressEntries[entryIdx].steps.append("Error: \(error.localizedDescription)")
-                    aiProgressEntries[entryIdx].failed = true
-                    errorMessage = "AI analysis failed: \(error.localizedDescription)"
-                }
-            }
-        }
-
         // Replace matching entry (including stubs) or append
         if let idx = persons.firstIndex(where: {
             !$0.wikiTitle.isEmpty && $0.wikiTitle == editable.wikiTitle
@@ -336,6 +296,61 @@ final class iPadPersonViewModel: ObservableObject {
             persons.append(editable)
         }
         selectedPersonID = editable.id
+    }
+
+    // MARK: - AI Analysis
+
+    func analyzeWithLLM() async {
+        guard hasData else { return }
+        let llm = LLMSettings.shared
+        let key = llm.apiKey.isEmpty
+            ? (ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? "")
+            : llm.apiKey
+        guard !key.isEmpty else {
+            errorMessage = "AI Analysis requires an Anthropic API key. Configure it in Settings."
+            return
+        }
+        errorMessage = nil
+        aiProgressEntries = []
+        isAnalyzing = true
+        showingAIProgress = true
+        defer { isAnalyzing = false }
+
+        let targets = persons.filter { !$0.isStub && !$0.wikiTitle.isEmpty }
+        for (index, person) in targets.enumerated() {
+            if targets.count > 1 {
+                statusMessage = "Analysing \(index + 1) of \(targets.count)…"
+            }
+            let entryIdx = aiProgressEntries.count
+            aiProgressEntries.append(AIProgressEntry(title: person.wikiTitle))
+            do {
+                let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: person.wikiTitle, verbose: false)
+                let extract  = person.wikiExtract.isEmpty ? nil : person.wikiExtract
+                let analysis = try await LLMClient.analyze(
+                    pageTitle:  person.wikiTitle,
+                    wikitext:   wikitext,
+                    extract:    extract,
+                    apiKey:     key,
+                    verbose:    false,
+                    onProgress: { [weak self] message in
+                        guard let self else { return }
+                        self.aiProgressEntries[entryIdx].steps.append(message)
+                    })
+                if let idx = persons.firstIndex(where: { $0.id == person.id }) {
+                    persons[idx].llmAlternateNames = analysis.alternateNames
+                    persons[idx].llmTitles         = analysis.additionalTitles
+                    persons[idx].llmFacts          = analysis.additionalFacts.map { EditablePersonFact(from: $0) }
+                    persons[idx].llmEvents         = analysis.additionalEvents.map { EditableCustomEvent(from: $0) }
+                    persons[idx].influentialPeople = analysis.influentialPeople.map { EditableInfluentialPerson(from: $0) }
+                }
+                aiProgressEntries[entryIdx].isDone = true
+            } catch {
+                aiProgressEntries[entryIdx].steps.append("Error: \(error.localizedDescription)")
+                aiProgressEntries[entryIdx].failed = true
+                errorMessage = "AI analysis failed for \(person.wikiTitle): \(error.localizedDescription)"
+            }
+        }
+        statusMessage = nil
     }
 
     // MARK: - Export as GEDCOM
