@@ -14,14 +14,27 @@ A Swift toolkit that converts Wikipedia biography articles into standards-compli
 
 ### Installation
 
+**Option A — Xcode (recommended for debugging and development)**
+
 ```bash
 git clone https://github.com/psteinauer/WikipediaScraper.git
 cd WikipediaScraper
-make app                    # → WikipediaScraper.app in project root
-cp -r WikipediaScraper.app /Applications/
+make xcode                  # opens WikipediaScraper.xcworkspace in Xcode
 ```
 
-Double-click the app in Finder or Launchpad to open it. On first launch macOS may show an unidentified-developer warning — right-click → Open → Open to dismiss it once.
+Select the **Wikipedia to GEDCOM (macOS)** scheme, choose your Mac as the run destination, and press Run (⌘R).
+
+**Option B — command-line release build**
+
+```bash
+git clone https://github.com/psteinauer/WikipediaScraper.git
+cd WikipediaScraper
+make app-release
+# app lands at: build/Build/Products/Release/WikipediaScraperApp.app
+cp -r build/Build/Products/Release/WikipediaScraperApp.app /Applications/
+```
+
+On first launch macOS may show an unidentified-developer warning — right-click → Open → Open to dismiss it once.
 
 ### How to use it
 
@@ -91,19 +104,25 @@ All sections except **Name and Gender** start collapsed by default.
 
 ### Installation
 
-Open the workspace in Xcode and run the `Wikipedia to GEDCOM (iPadOS)` scheme on an iPad or iPad simulator.
-
-To build for a connected iPad device:
+**Option A — Xcode (recommended)**
 
 ```bash
-make xcode-ipad  # open WikipediaScraperIPad.xcodeproj in Xcode
-# Select the WikipediaScraperIPad scheme → your iPad → Run
+make xcode      # opens WikipediaScraper.xcworkspace in Xcode
 ```
 
-To build in the simulator from the command line (requires Xcode):
+Select the **Wikipedia to GEDCOM (iPadOS)** scheme, choose a connected iPad or simulator, and press Run (⌘R).
+
+**Option B — simulator from the command line**
 
 ```bash
-make ipad-sim    # builds for iPad Pro 13-inch (M5) simulator
+make ipad-sim                                    # iPad Pro 13-inch (M5) simulator
+make ipad-sim IPAD_SIM_NAME="iPad Air 13-inch (M2)"  # different simulator
+```
+
+**Option C — device release build**
+
+```bash
+make ipad       # builds for a connected device; use Xcode to install the .ipa
 ```
 
 ### How to use it
@@ -395,18 +414,21 @@ Individual Xcode projects are also available:
 
 | Command | Description |
 |---------|-------------|
-| `make build` | Debug binaries (`.build/debug/`) |
-| `make release` | Optimised release binaries |
-| `make app` | Release macOS `.app` bundle → `WikipediaScraper.app` |
-| `make install` | Build release CLI and install to `/usr/local/bin` |
-| `make install INSTALL_PREFIX=<dir>` | Install CLI to custom directory |
-| `make ipad-sim` | Build iPadOS app for iPad Pro 13-inch (M5) simulator (requires Xcode) |
-| `make ipad` | Build iPadOS app release for device (requires Xcode) |
-| `make xcode-ipad` | Open `WikipediaScraperIPad.xcodeproj` in Xcode |
-| `make icons` | Regenerate all app icon PNGs (macOS + iPadOS) |
-| `make xcode` | Open package in Xcode |
-| `make clean` | Remove build artefacts and `WikipediaScraper.app` |
-| `make test` | Smoke-test CLI against George Washington article |
+| `make all` | Build every target (macOS app + extensions + CLI + iPadOS app) via the workspace |
+| `make build` | CLI debug binary via SPM → `.build/debug/WikipediaScraper` |
+| `make release` | CLI optimised release binary via SPM → `.build/release/WikipediaScraper` |
+| `make install` | CLI release binary installed to `/usr/local/bin` |
+| `make install INSTALL_PREFIX=<dir>` | CLI installed to a custom directory |
+| `make app` | macOS app + Share Extension (Debug) → `build/Build/Products/Debug/WikipediaScraperApp.app` |
+| `make app-release` | macOS app + Share Extension (Release) → `build/Build/Products/Release/WikipediaScraperApp.app` |
+| `make ipad-sim` | iPadOS app + Share Extension built for iPad Pro 13-inch (M5) simulator, then launched |
+| `make ipad-sim IPAD_SIM_NAME="<name>"` | Same, targeting a named simulator |
+| `make ipad-sim-reset` | Erase and reboot the iPad simulator (fixes stale-state crashes) |
+| `make ipad` | iPadOS app + Share Extension (Release) built for a connected device |
+| `make xcode` | Open `WikipediaScraper.xcworkspace` in Xcode |
+| `make icons` | Regenerate all app icon PNGs (macOS + iPadOS) from `make_icon.swift` |
+| `make clean` | Remove `./build/` and SPM build artefacts |
+| `make test` | Smoke-test CLI against the George Washington Wikipedia article |
 
 ---
 
