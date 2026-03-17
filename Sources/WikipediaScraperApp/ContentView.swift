@@ -179,18 +179,15 @@ struct ContentView: View {
             }
         }
 
-        // Fetch / status indicator
+        // Fetch / status indicator — its own automatic item
         ToolbarItem(placement: .automatic) {
             fetchControl
         }
 
-        // AI Analysis
-        ToolbarItem(placement: .automatic) {
-            aiAnalysisControl
-        }
-
-        // Document drag handle + Export — share the primaryAction group
+        // AI Analysis + drag handle + Export — explicit trailing group
+        // so macOS sizes the oval for all three icons from the start.
         ToolbarItemGroup(placement: .primaryAction) {
+            aiAnalysisControl
             documentDragHandle
             exportMenu
         }
