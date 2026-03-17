@@ -220,6 +220,7 @@ struct ContentView: View {
             .disabled(vm.urls.isEmpty)
             .keyboardShortcut(.return, modifiers: .command)
             .help("Fetch Wikipedia articles (⌘↩)")
+            .padding(.horizontal, 4)
         }
     }
 
@@ -261,6 +262,7 @@ struct ContentView: View {
         Image(systemName: "arrow.up.doc.fill")
             .symbolRenderingMode(.hierarchical)
             .foregroundStyle(vm.hasData ? Color.accentColor : Color.secondary.opacity(0.3))
+            .padding(.horizontal, 4)
             .help(tip)
             .onDrag {
                 guard vm.hasData else { return NSItemProvider() }
