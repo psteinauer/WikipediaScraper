@@ -189,13 +189,9 @@ struct ContentView: View {
             aiAnalysisControl
         }
 
-        // Document drag handle
-        ToolbarItem(placement: .automatic) {
+        // Document drag handle + Export — share the primaryAction group
+        ToolbarItemGroup(placement: .primaryAction) {
             documentDragHandle
-        }
-
-        // Export
-        ToolbarItem(placement: .primaryAction) {
             exportMenu
         }
     }
