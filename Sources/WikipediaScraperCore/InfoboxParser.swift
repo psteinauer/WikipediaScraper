@@ -316,6 +316,56 @@ public struct InfoboxParser {
         return (person, fields)
     }
 
+    // MARK: - Person page detection
+
+    /// Returns `true` if the wikitext appears to describe a biographical person article.
+    ///
+    /// Two independent signals are checked so that articles with unusual infobox
+    /// names (sports biographies, religious figures, etc.) are still accepted, and
+    /// non-person articles with person-sounding names are still rejected:
+    ///
+    /// 1. **Wikipedia biography categories** — editors are required to add
+    ///    `[[Category:YYYY births]]`, `[[Category:Living people]]`, etc. to every
+    ///    biographical article.  These are the most reliable signal.
+    /// 2. **Infobox template name** — the name after `{{Infobox` is checked for
+    ///    keywords that unambiguously identify person templates.
+    public static func isPersonPage(wikitext: String) -> Bool {
+        let lower = wikitext.lowercased()
+
+        // ── Signal 1: biography maintenance categories ─────────────────────
+        let exactCats = [
+            "[[category:living people]]",
+            "[[category:year of birth unknown]]",
+            "[[category:year of birth missing (living people)]]",
+            "[[category:year of birth missing]]",
+            "[[category:year of death unknown]]",
+            "[[category:year of death missing]]",
+        ]
+        for cat in exactCats where lower.contains(cat) { return true }
+
+        // "[[Category:1732 births]]" / "[[Category:1901 deaths]]"
+        if lower.range(of: #"\[\[category:\d{4} births\]\]"#,  options: .regularExpression) != nil { return true }
+        if lower.range(of: #"\[\[category:\d{4} deaths\]\]"#,  options: .regularExpression) != nil { return true }
+
+        // ── Signal 2: person-type infobox name ─────────────────────────────
+        if let infoboxRange = lower.range(of: "{{infobox") {
+            // Skip any whitespace between "{{infobox" and the template name
+            let rest = lower[infoboxRange.upperBound...].drop(while: { $0 == " " })
+            let nameEnd = rest.firstIndex(where: { $0 == "|" || $0 == "\n" || $0 == "}" }) ?? rest.endIndex
+            let name = String(rest[..<nameEnd]).trimmingCharacters(in: .whitespaces)
+
+            let personKeywords = [
+                "person", "biography", "officeholder", "royalty", "military person",
+                "politician", "actor", "actress", "musician", "artist", "writer",
+                "scientist", "academic", "philosopher", "sportsperson", "criminal",
+                "judge", "clergy", "saint", "noble", "monarch", "comedian", "model",
+            ]
+            for kw in personKeywords where name.contains(kw) { return true }
+        }
+
+        return false
+    }
+
     // MARK: - Infobox extraction
 
     private static func extractInfoboxFields(from wikitext: String, verbose: Bool) -> [String: String]? {

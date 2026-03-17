@@ -5,6 +5,16 @@ import UniformTypeIdentifiers
 import WikipediaScraperCore
 @preconcurrency import WikipediaScraperSharedUI
 
+private enum PersonImportError: LocalizedError {
+    case notAPersonPage(title: String)
+    var errorDescription: String? {
+        switch self {
+        case .notAPersonPage(let title):
+            return "\"\(title)\" doesn't appear to be a person page and won't be imported."
+        }
+    }
+}
+
 @MainActor
 final class PersonViewModel: ObservableObject {
     @Published var urls: [String] = [] {
@@ -205,6 +215,9 @@ final class PersonViewModel: ObservableObject {
             }
             do {
                 try await fetchOne(fetchURL, index: index, total: urls.count)
+            } catch let e as PersonImportError {
+                errorMessage = e.localizedDescription
+                urls.removeAll { $0 == fetchURL }
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -221,6 +234,10 @@ final class PersonViewModel: ObservableObject {
         async let summaryResult  = WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: false)
         async let wikitextResult = WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: false)
         let (summary, wikitext)  = try await (summaryResult, wikitextResult)
+
+        guard InfoboxParser.isPersonPage(wikitext: wikitext) else {
+            throw PersonImportError.notAPersonPage(title: pageTitle)
+        }
 
         let (parsedPerson, _) = InfoboxParser.parse(
             wikitext:  wikitext,
@@ -290,6 +307,9 @@ final class PersonViewModel: ObservableObject {
             try await fetchOne(urlString, index: 0, total: 1)
         } catch is CancellationError {
             // Task was cancelled (e.g. scene lifecycle); nothing to show.
+        } catch let e as PersonImportError {
+            errorMessage = e.localizedDescription
+            urls.removeAll { $0 == urlString }
         } catch {
             errorMessage = error.localizedDescription
         }

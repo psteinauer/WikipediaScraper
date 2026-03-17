@@ -172,7 +172,13 @@ struct WikipediaScraper: AsyncParsableCommand {
             let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: verbose)
             if verbose { fputs("\(urlLabel)Wikitext: \(wikitext.count) characters\n", stderr) }
 
-            // ── 4. Parse infobox ───────────────────────────────────────────
+            // ── 4. Validate: must be a person page ────────────────────────
+            guard InfoboxParser.isPersonPage(wikitext: wikitext) else {
+                fputs("Error: \"\(pageTitle)\" doesn't appear to be a person page and won't be imported.\n", stderr)
+                throw ExitCode.failure
+            }
+
+            // ── 5. Parse infobox ───────────────────────────────────────────
             if verbose { fputs("\(urlLabel)Parsing infobox…\n", stderr) }
             var (person, rawFields) = InfoboxParser.parse(wikitext: wikitext,
                                                           pageTitle: pageTitle,
