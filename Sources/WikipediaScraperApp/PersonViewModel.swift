@@ -5,15 +5,6 @@ import UniformTypeIdentifiers
 import WikipediaScraperCore
 @preconcurrency import WikipediaScraperSharedUI
 
-private enum PersonImportError: LocalizedError {
-    case notAPersonPage(title: String)
-    var errorDescription: String? {
-        switch self {
-        case .notAPersonPage(let title):
-            return "\"\(title)\" doesn't appear to be a person page and won't be imported."
-        }
-    }
-}
 
 @MainActor
 final class PersonViewModel: ObservableObject {
@@ -215,9 +206,9 @@ final class PersonViewModel: ObservableObject {
             }
             do {
                 try await fetchOne(fetchURL, index: index, total: urls.count)
-            } catch let e as PersonImportError {
+            } catch let e as ScraperError {
+                if case .notAPersonPage = e { urls.removeAll { $0 == fetchURL } }
                 errorMessage = e.localizedDescription
-                urls.removeAll { $0 == fetchURL }
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -228,71 +219,32 @@ final class PersonViewModel: ObservableObject {
     }
 
     private func fetchOne(_ fetchURL: String, index: Int, total: Int) async throws {
-        let multi = total > 1
-        let pageTitle = try WikipediaClient.pageTitle(from: fetchURL)
-
-        async let summaryResult  = WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: false)
-        async let wikitextResult = WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: false)
-        let (summary, wikitext)  = try await (summaryResult, wikitextResult)
-
-        guard InfoboxParser.isPersonPage(wikitext: wikitext) else {
-            throw PersonImportError.notAPersonPage(title: pageTitle)
+        guard let url = URL(string: fetchURL) else {
+            throw ScraperError.invalidURL(fetchURL)
+        }
+        guard let scraper = ScraperRegistry.scraper(for: url) else {
+            throw ScraperError.invalidURL("No scraper available for \(fetchURL)")
         }
 
-        let (parsedPerson, _) = InfoboxParser.parse(
-            wikitext:  wikitext,
-            pageTitle: pageTitle,
-            verbose:   false
+        if total > 1 { statusMessage = "Fetching \(index + 1) of \(total)…" }
+
+        let options = ScrapeOptions(
+            includeNotes:     useNotes,
+            includeAllImages: useAllImages,
+            onProgress: { [weak self] msg in
+                Task { @MainActor [weak self] in self?.statusMessage = msg }
+            }
         )
 
-        var editable = EditablePerson(from: parsedPerson)
-        editable.wikiTitle = summary.title
-        if editable.wikiURL.isEmpty { editable.wikiURL = fetchURL }
-        if let extract = summary.extract, editable.wikiExtract.isEmpty {
-            editable.wikiExtract = extract
-        }
-        // Prefer the summary's direct upload.wikimedia.org URL over the
-        // Special:FilePath redirect produced by the infobox parser.
-        editable.imageURL = summary.originalimage?.source
-            ?? summary.thumbnail?.source
-            ?? editable.imageURL
-
-        // ── Notes ─────────────────────────────────────────────────────────
-        if useNotes {
-            statusMessage = multi ? "Fetching sections (\(index + 1)/\(total))…" : "Fetching article sections…"
-            do {
-                editable.wikiSections = try await WikipediaClient.fetchSections(
-                    pageTitle: pageTitle, verbose: false)
-            } catch { /* non-fatal */ }
-        }
-
-        // ── All images ─────────────────────────────────────────────────────
-        if useAllImages {
-            statusMessage = multi ? "Fetching images (\(index + 1)/\(total))…" : "Fetching image list…"
-            do {
-                let primaryURL = editable.imageURL.isEmpty ? nil : editable.imageURL
-                let infos = try await WikipediaClient.fetchAllImageURLs(
-                    pageTitle:    pageTitle,
-                    excludingURL: primaryURL,
-                    verbose:      false)
-
-                editable.additionalMedia = infos.map { info in
-                    var item = EditableMediaItem()
-                    item.url     = info.url
-                    item.caption = info.title
-                        .replacingOccurrences(of: "File:", with: "")
-                        .replacingOccurrences(of: "_", with: " ")
-                    return item
-                }
-            } catch { /* non-fatal */ }
-        }
+        let personData = try await scraper.scrape(url: url, options: options, verbose: false)
+        var editable   = EditablePerson(from: personData)
 
         // Replace matching entry (including stubs) or append
         if let idx = persons.firstIndex(where: {
             !$0.wikiTitle.isEmpty && $0.wikiTitle == editable.wikiTitle
         }) {
-            editable.id = persons[idx].id
-            persons[idx] = editable
+            editable.id    = persons[idx].id
+            persons[idx]   = editable
         } else {
             persons.append(editable)
         }
@@ -307,9 +259,9 @@ final class PersonViewModel: ObservableObject {
             try await fetchOne(urlString, index: 0, total: 1)
         } catch is CancellationError {
             // Task was cancelled (e.g. scene lifecycle); nothing to show.
-        } catch let e as PersonImportError {
+        } catch let e as ScraperError {
+            if case .notAPersonPage = e { urls.removeAll { $0 == urlString } }
             errorMessage = e.localizedDescription
-            urls.removeAll { $0 == urlString }
         } catch {
             errorMessage = error.localizedDescription
         }

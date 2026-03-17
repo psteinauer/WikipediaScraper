@@ -288,12 +288,20 @@ public enum ScraperError: LocalizedError {
     case invalidURL(String)
     case httpError(Int, String)
     case parseError(String)
+    case notAPersonPage(String)
 
     public var errorDescription: String? {
         switch self {
         case .invalidURL(let s): return "Invalid URL: \(s)"
         case .httpError(let code, let url): return "HTTP \(code) from \(url)"
         case .parseError(let msg): return "Parse error: \(msg)"
+        case .notAPersonPage(let title):
+            return "\"\(title)\" doesn't appear to be a person page and won't be imported."
         }
+    }
+
+    public var isNotAPersonPage: Bool {
+        if case .notAPersonPage = self { return true }
+        return false
     }
 }

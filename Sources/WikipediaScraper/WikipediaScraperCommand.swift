@@ -157,155 +157,221 @@ struct WikipediaScraper: AsyncParsableCommand {
 
             let urlLabel = wikipediaURLs.count > 1 ? "[\(index + 1)/\(wikipediaURLs.count)] " : ""
 
-            // ── 1. Resolve page title ──────────────────────────────────────
-            if verbose { fputs("\(urlLabel)Resolving page title…\n", stderr) }
-            let pageTitle = try WikipediaClient.pageTitle(from: wikipediaURL)
-            if verbose { fputs("\(urlLabel)Page title: \(pageTitle)\n", stderr) }
-            if firstPageTitle == nil { firstPageTitle = pageTitle }
-
-            // ── 2. Fetch REST summary ──────────────────────────────────────
-            if verbose { fputs("\(urlLabel)Fetching article summary…\n", stderr) }
-            let summary = try await WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: verbose)
-
-            // ── 3. Fetch wikitext ──────────────────────────────────────────
-            if verbose { fputs("\(urlLabel)Fetching wikitext…\n", stderr) }
-            let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: verbose)
-            if verbose { fputs("\(urlLabel)Wikitext: \(wikitext.count) characters\n", stderr) }
-
-            // ── 4. Validate: must be a person page ────────────────────────
-            guard InfoboxParser.isPersonPage(wikitext: wikitext) else {
-                fputs("Error: \"\(pageTitle)\" doesn't appear to be a person page and won't be imported.\n", stderr)
+            guard let pageURL = URL(string: wikipediaURL) else {
+                fputs("Error: Invalid URL '\(wikipediaURL)'\n", stderr)
                 throw ExitCode.failure
             }
 
-            // ── 5. Parse infobox ───────────────────────────────────────────
-            if verbose { fputs("\(urlLabel)Parsing infobox…\n", stderr) }
-            var (person, rawFields) = InfoboxParser.parse(wikitext: wikitext,
-                                                          pageTitle: pageTitle,
-                                                          verbose: verbose,
-                                                          config: config)
-            person.wikiURL     = wikipediaURL
-            person.wikiTitle   = summary.title   // use canonical title (handles redirects)
-            person.wikiExtract = summary.extract
+            // ── Wikipedia URLs: full pipeline with LLM, mappings, images ──
+            if WikipediaScraperCore.WikipediaScraper.canHandle(url: pageURL) {
 
-            // Best image URL from REST summary, fallback to infobox-derived URL
-            let imageSourceURL = summary.originalimage?.source
-                              ?? summary.thumbnail?.source
-                              ?? person.imageURL
-            person.imageURL = imageSourceURL
+                // ── 1. Resolve page title ──────────────────────────────────
+                if verbose { fputs("\(urlLabel)Resolving page title…\n", stderr) }
+                let pageTitle = try WikipediaClient.pageTitle(from: wikipediaURL)
+                if verbose { fputs("\(urlLabel)Page title: \(pageTitle)\n", stderr) }
+                if firstPageTitle == nil { firstPageTitle = pageTitle }
 
-            // ── 4b. LLM enrichment (--llm) ────────────────────────────────
-            if llm {
-                let key = apiKey ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? ""
-                if key.isEmpty {
-                    fputs("Warning: --llm requires an Anthropic API key (--api-key or ANTHROPIC_API_KEY env var)\n", stderr)
-                } else {
-                    if verbose { fputs("\(urlLabel)Running LLM analysis…\n", stderr) }
-                    do {
-                        let analysis = try await LLMClient.analyze(
-                            pageTitle: pageTitle,
-                            wikitext:  wikitext,
-                            extract:   summary.extract,
-                            apiKey:    key,
-                            verbose:   verbose)
+                // ── 2. Fetch REST summary ──────────────────────────────────
+                if verbose { fputs("\(urlLabel)Fetching article summary…\n", stderr) }
+                let summary = try await WikipediaClient.fetchSummary(pageTitle: pageTitle, verbose: verbose)
 
-                        // Store LLM data in separate fields — GEDCOMBuilder will cite
-                        // Claude as the source and add notes to distinguish from infobox data.
-                        let existingNames = Set(person.alternateNames)
-                        person.llmAlternateNames  = analysis.alternateNames.filter { !existingNames.contains($0) }
-                        person.llmTitles          = analysis.additionalTitles
-                        person.llmFacts           = analysis.additionalFacts
-                        person.llmEvents          = analysis.additionalEvents
-                        person.influentialPeople  = analysis.influentialPeople
-                    } catch {
-                        fputs("Warning: LLM analysis failed for \(pageTitle): \(error.localizedDescription)\n", stderr)
-                    }
+                // ── 3. Fetch wikitext ──────────────────────────────────────
+                if verbose { fputs("\(urlLabel)Fetching wikitext…\n", stderr) }
+                let wikitext = try await WikipediaClient.fetchWikitext(pageTitle: pageTitle, verbose: verbose)
+                if verbose { fputs("\(urlLabel)Wikitext: \(wikitext.count) characters\n", stderr) }
+
+                // ── 4. Validate: must be a person page ────────────────────
+                guard InfoboxParser.isPersonPage(wikitext: wikitext) else {
+                    fputs("Error: \"\(pageTitle)\" doesn't appear to be a person page and won't be imported.\n", stderr)
+                    throw ExitCode.failure
                 }
-            }
 
-            // ── Mappings mode (per URL) ────────────────────────────────────
-            if mappings {
-                let report = MappingsReporter.report(person: person,
-                                                     rawFields: rawFields,
-                                                     wikiURL: wikipediaURL)
-                print(report, terminator: "")
-                continue   // process remaining URLs
-            }
+                // ── 5. Parse infobox ───────────────────────────────────────
+                if verbose { fputs("\(urlLabel)Parsing infobox…\n", stderr) }
+                var (person, rawFields) = InfoboxParser.parse(wikitext: wikitext,
+                                                              pageTitle: pageTitle,
+                                                              verbose: verbose,
+                                                              config: config)
+                person.wikiURL     = wikipediaURL
+                person.wikiTitle   = summary.title
+                person.wikiExtract = summary.extract
 
-            // ── 4b. Wikipedia sections (--notes) ──────────────────────────
-            if notes {
-                if verbose { fputs("\(urlLabel)Fetching article sections for --notes…\n", stderr) }
-                do {
-                    person.wikiSections = try await WikipediaClient.fetchSections(
-                        pageTitle: pageTitle, verbose: verbose)
-                    if verbose { fputs("\(urlLabel)Sections: \(person.wikiSections.count) found\n", stderr) }
-                } catch {
-                    fputs("Warning: Could not fetch article sections for \(pageTitle): \(error.localizedDescription)\n", stderr)
-                }
-            }
+                let imageSourceURL = summary.originalimage?.source
+                                  ?? summary.thumbnail?.source
+                                  ?? person.imageURL
+                person.imageURL = imageSourceURL
 
-            // ── 5. Image handling ──────────────────────────────────────────
-            let safeTitle = sanitize(pageTitle)
-
-            // Portrait (zip or allimages mode)
-            if effectiveZip, let imgURL = imageSourceURL {
-                if verbose { fputs("\(urlLabel)Downloading portrait image for GEDZIP…\n", stderr) }
-                do {
-                    let (data, mime) = try await WikipediaClient.fetchImageData(from: imgURL, verbose: verbose)
-                    person.imageData     = data
-                    person.imageMimeType = mime
-                    let ext       = imageExtension(mime: mime, url: imgURL)
-                    let mediaPath = "media/\(safeTitle).\(ext)"
-                    person.imageFilePath = mediaPath
-                    mediaFiles.append((mediaPath, data))
-                    if verbose { fputs("\(urlLabel)Portrait: \(data.count) bytes → \(mediaPath)\n", stderr) }
-                } catch {
-                    fputs("Warning: Could not download portrait for \(pageTitle): \(error.localizedDescription)\n", stderr)
-                }
-            }
-
-            // Additional images (--allimages)
-            if allimages {
-                if verbose { fputs("\(urlLabel)Fetching all article image URLs…\n", stderr) }
-                do {
-                    let allImgInfos = try await WikipediaClient.fetchAllImageURLs(
-                        pageTitle:    pageTitle,
-                        excludingURL: imageSourceURL,
-                        verbose:      verbose)
-                    if verbose { fputs("\(urlLabel)Found \(allImgInfos.count) additional images\n", stderr) }
-
-                    for imgInfo in allImgInfos {
-                        if verbose { fputs("  Downloading \(imgInfo.title)…\n", stderr) }
+                // ── LLM enrichment (--llm) ────────────────────────────────
+                if llm {
+                    let key = apiKey ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"] ?? ""
+                    if key.isEmpty {
+                        fputs("Warning: --llm requires an Anthropic API key (--api-key or ANTHROPIC_API_KEY env var)\n", stderr)
+                    } else {
+                        if verbose { fputs("\(urlLabel)Running LLM analysis…\n", stderr) }
                         do {
-                            let (data, actualMime) = try await WikipediaClient.fetchImageData(
-                                from: imgInfo.url, verbose: false)
-                            // Use the extension from the File: title, not from MIME
-                            let fileTitle = imgInfo.title.replacingOccurrences(of: "File:", with: "")
-                            let origExt   = (fileTitle as NSString).pathExtension.lowercased()
-                            let ext       = origExt.isEmpty ? imageExtension(mime: actualMime, url: imgInfo.url) : origExt
-                            let nameNoExt = (fileTitle as NSString).deletingPathExtension
-                            let baseName  = sanitize(nameNoExt)
-                            let mediaPath = "media/\(baseName).\(ext)"
-                            let caption   = nameNoExt.replacingOccurrences(of: "_", with: " ")
-                            person.additionalMedia.append(AdditionalMedia(
-                                filePath: mediaPath,
-                                origURL:  imgInfo.url,
-                                title:    caption.isEmpty ? nil : caption,
-                                mimeType: actualMime))
-                            mediaFiles.append((mediaPath, data))
-                            if verbose { fputs("    \(data.count) bytes → \(mediaPath)\n", stderr) }
+                            let analysis = try await LLMClient.analyze(
+                                pageTitle: pageTitle,
+                                wikitext:  wikitext,
+                                extract:   summary.extract,
+                                apiKey:    key,
+                                verbose:   verbose)
+                            let existingNames = Set(person.alternateNames)
+                            person.llmAlternateNames  = analysis.alternateNames.filter { !existingNames.contains($0) }
+                            person.llmTitles          = analysis.additionalTitles
+                            person.llmFacts           = analysis.additionalFacts
+                            person.llmEvents          = analysis.additionalEvents
+                            person.influentialPeople  = analysis.influentialPeople
                         } catch {
-                            fputs("Warning: Could not download \(imgInfo.title): \(error.localizedDescription)\n", stderr)
+                            fputs("Warning: LLM analysis failed for \(pageTitle): \(error.localizedDescription)\n", stderr)
                         }
                     }
-                } catch {
-                    fputs("Warning: Could not fetch image list for \(pageTitle): \(error.localizedDescription)\n", stderr)
+                }
+
+                // ── Mappings mode (per URL) ────────────────────────────────
+                if mappings {
+                    let report = MappingsReporter.report(person: person,
+                                                         rawFields: rawFields,
+                                                         wikiURL: wikipediaURL)
+                    print(report, terminator: "")
+                    continue
+                }
+
+                // ── Wikipedia sections (--notes) ───────────────────────────
+                if notes {
+                    if verbose { fputs("\(urlLabel)Fetching article sections for --notes…\n", stderr) }
+                    do {
+                        person.wikiSections = try await WikipediaClient.fetchSections(
+                            pageTitle: pageTitle, verbose: verbose)
+                        if verbose { fputs("\(urlLabel)Sections: \(person.wikiSections.count) found\n", stderr) }
+                    } catch {
+                        fputs("Warning: Could not fetch article sections for \(pageTitle): \(error.localizedDescription)\n", stderr)
+                    }
+                }
+
+                // ── Image handling ─────────────────────────────────────────
+                let safeTitle = sanitize(pageTitle)
+
+                if effectiveZip, let imgURL = imageSourceURL {
+                    if verbose { fputs("\(urlLabel)Downloading portrait image for GEDZIP…\n", stderr) }
+                    do {
+                        let (data, mime) = try await WikipediaClient.fetchImageData(from: imgURL, verbose: verbose)
+                        person.imageData     = data
+                        person.imageMimeType = mime
+                        let ext       = imageExtension(mime: mime, url: imgURL)
+                        let mediaPath = "media/\(safeTitle).\(ext)"
+                        person.imageFilePath = mediaPath
+                        mediaFiles.append((mediaPath, data))
+                        if verbose { fputs("\(urlLabel)Portrait: \(data.count) bytes → \(mediaPath)\n", stderr) }
+                    } catch {
+                        fputs("Warning: Could not download portrait for \(pageTitle): \(error.localizedDescription)\n", stderr)
+                    }
+                }
+
+                if allimages {
+                    if verbose { fputs("\(urlLabel)Fetching all article image URLs…\n", stderr) }
+                    do {
+                        let allImgInfos = try await WikipediaClient.fetchAllImageURLs(
+                            pageTitle:    pageTitle,
+                            excludingURL: imageSourceURL,
+                            verbose:      verbose)
+                        if verbose { fputs("\(urlLabel)Found \(allImgInfos.count) additional images\n", stderr) }
+                        for imgInfo in allImgInfos {
+                            if verbose { fputs("  Downloading \(imgInfo.title)…\n", stderr) }
+                            do {
+                                let (data, actualMime) = try await WikipediaClient.fetchImageData(
+                                    from: imgInfo.url, verbose: false)
+                                let fileTitle = imgInfo.title.replacingOccurrences(of: "File:", with: "")
+                                let origExt   = (fileTitle as NSString).pathExtension.lowercased()
+                                let ext       = origExt.isEmpty ? imageExtension(mime: actualMime, url: imgInfo.url) : origExt
+                                let nameNoExt = (fileTitle as NSString).deletingPathExtension
+                                let baseName  = sanitize(nameNoExt)
+                                let mediaPath = "media/\(baseName).\(ext)"
+                                let caption   = nameNoExt.replacingOccurrences(of: "_", with: " ")
+                                person.additionalMedia.append(AdditionalMedia(
+                                    filePath: mediaPath,
+                                    origURL:  imgInfo.url,
+                                    title:    caption.isEmpty ? nil : caption,
+                                    mimeType: actualMime))
+                                mediaFiles.append((mediaPath, data))
+                                if verbose { fputs("    \(data.count) bytes → \(mediaPath)\n", stderr) }
+                            } catch {
+                                fputs("Warning: Could not download \(imgInfo.title): \(error.localizedDescription)\n", stderr)
+                            }
+                        }
+                    } catch {
+                        fputs("Warning: Could not fetch image list for \(pageTitle): \(error.localizedDescription)\n", stderr)
+                    }
+                }
+
+                persons.append(person)
+                if verbose { printSummary(person: person) }
+
+            } else {
+                // ── Non-Wikipedia URLs: generic scraper path ───────────────
+                guard let scraper = ScraperRegistry.scraper(for: pageURL) else {
+                    fputs("Error: No scraper available for '\(wikipediaURL)'\n", stderr)
+                    throw ExitCode.failure
+                }
+
+                if firstPageTitle == nil {
+                    firstPageTitle = URLComponents(url: pageURL, resolvingAgainstBaseURL: false)?
+                        .queryItems?.first(where: { $0.name == "id" })?.value
+                        ?? pageURL.lastPathComponent
+                }
+
+                var progressCallback: (@Sendable (String) -> Void)? = nil
+                if verbose { progressCallback = { msg in fputs("  \(msg)\n", stderr) } }
+                let scrapeOptions = ScrapeOptions(
+                    includeNotes:     notes,
+                    includeAllImages: allimages,
+                    onProgress:       progressCallback
+                )
+
+                do {
+                    var person = try await scraper.scrape(url: pageURL, options: scrapeOptions, verbose: verbose)
+
+                    // Download portrait for ZIP output
+                    if effectiveZip, let imgURL = person.imageURL, !imgURL.isEmpty {
+                        if verbose { fputs("\(urlLabel)Downloading portrait image…\n", stderr) }
+                        do {
+                            let (data, mime) = try await WikipediaClient.fetchImageData(from: imgURL, verbose: verbose)
+                            person.imageData     = data
+                            person.imageMimeType = mime
+                            let safeTitle = sanitize(person.wikiTitle ?? person.name ?? "person")
+                            let ext       = imageExtension(mime: mime, url: imgURL)
+                            let mediaPath = "media/\(safeTitle).\(ext)"
+                            person.imageFilePath = mediaPath
+                            mediaFiles.append((mediaPath, data))
+                        } catch {
+                            fputs("Warning: Could not download portrait: \(error.localizedDescription)\n", stderr)
+                        }
+                    }
+
+                    // Download additional media for ZIP output
+                    if effectiveZip {
+                        for (j, media) in person.additionalMedia.enumerated() {
+                            let imgURL = media.origURL ?? media.filePath
+                            guard !imgURL.isEmpty else { continue }
+                            do {
+                                let (data, mime) = try await WikipediaClient.fetchImageData(from: imgURL, verbose: false)
+                                let safeTitle = sanitize(person.wikiTitle ?? person.name ?? "person")
+                                let ext       = imageExtension(mime: mime, url: imgURL)
+                                let mediaPath = "media/\(safeTitle)_\(j + 1).\(ext)"
+                                person.additionalMedia[j].filePath = mediaPath
+                                mediaFiles.append((mediaPath, data))
+                            } catch {
+                                fputs("Warning: Could not download media: \(error.localizedDescription)\n", stderr)
+                            }
+                        }
+                    }
+
+                    persons.append(person)
+                    if verbose { printSummary(person: person) }
+                } catch let e as ScraperError {
+                    fputs("Error: \(e.localizedDescription)\n", stderr)
+                    throw ExitCode.failure
                 }
             }
-
-            persons.append(person)
-
-            if verbose { printSummary(person: person) }
         }
 
         // Mappings mode exits here (all reports already printed above)
