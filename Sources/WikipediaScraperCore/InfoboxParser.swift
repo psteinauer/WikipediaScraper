@@ -54,6 +54,23 @@ public struct InfoboxParser {
             if p.lowercased().contains("she") { person.sex = .female }
             else if p.lowercased().contains("he") { person.sex = .male }
         }
+        // Heuristic from gendered title fields (honorific_prefix, title, royal_title, etc.)
+        // Most monarch/nobility infoboxes lack a gender field but do carry a title like
+        // "King", "Queen", "Prince", "Princess", "Emperor", "Empress", etc.
+        if person.sex == .unknown {
+            let titleFieldKeys = ["honorific_prefix", "title", "royal_title",
+                                  "noble_title", "honorific_suffix", "office"]
+            for key in titleFieldKeys {
+                if let raw = fields[key], let inferred = inferSex(from: raw) {
+                    person.sex = inferred
+                    break
+                }
+            }
+        }
+        // Last resort: check the page title itself (e.g. "Queen Anne", "Empress Matilda").
+        if person.sex == .unknown {
+            person.sex = inferSex(from: pageTitle) ?? .unknown
+        }
 
         // Birth
         let birthDateRaw = fields["birth_date"] ?? fields["date_of_birth"] ?? fields["born"]
@@ -661,6 +678,23 @@ public struct InfoboxParser {
         }
 
         return spouses
+    }
+
+    /// Infer sex from a text string containing gendered title words.
+    /// Female titles are tested first so "princess" is caught before "prince".
+    private static func inferSex(from text: String) -> Sex? {
+        let lower = text.lowercased()
+        let femaleWords = ["queen", "princess", "empress", "duchess", "countess",
+                           "marchioness", "viscountess", "baroness", "lady",
+                           "dame", "abbess", "tsaritsa", "tsarina", "maharani",
+                           "sultana", "her majesty", "her royal highness"]
+        let maleWords   = ["king", "prince", "emperor", "duke", "earl", "count",
+                           "marquess", "viscount", "baron", "lord", "sir",
+                           "tsar", "czar", "sultan", "maharaja",
+                           "his majesty", "his royal highness"]
+        for word in femaleWords { if lower.contains(word) { return .female } }
+        for word in maleWords   { if lower.contains(word) { return .male   } }
+        return nil
     }
 
     private static func wikimediaThumbURL(filename: String) -> String {
