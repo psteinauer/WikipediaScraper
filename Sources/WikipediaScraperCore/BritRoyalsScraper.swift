@@ -1,4 +1,4 @@
-// BritRoyalsScraper.swift — PersonPageScraper for britroyals.com
+// BritRoyalsScraper.swift — BaseHTMLScraper subclass for britroyals.com
 //
 // Person pages use URLs like: kings.asp?id=henry6, queens.asp?id=victoria
 //
@@ -13,11 +13,9 @@
 
 import Foundation
 
-public struct BritRoyalsScraper: PersonPageScraper {
+public final class BritRoyalsScraper: BaseHTMLScraper {
 
-    public static let supportedHosts = ["britroyals.com"]
-
-    public init() {}
+    public override class var supportedHosts: [String] { ["britroyals.com"] }
 
     /// Only accept person-specific URLs — those with an `id=` query parameter.
     public static func canHandle(url: URL) -> Bool {
@@ -28,27 +26,19 @@ public struct BritRoyalsScraper: PersonPageScraper {
         return true
     }
 
-    public func scrape(url: URL, options: ScrapeOptions, verbose: Bool) async throws -> PersonData {
-        if verbose { fputs("  [britroyals] Fetching '\(url.absoluteString)'…\n", stderr) }
+    // MARK: - Validation
 
-        let (data, _) = try await URLSession.shared.data(from: url)
-        guard let html = String(data: data, encoding: .utf8)
-                      ?? String(data: data, encoding: .isoLatin1) else {
-            throw ScraperError.parseError("Could not decode HTML from \(url.absoluteString)")
-        }
-
-        // Validate: page must contain at least one known biography field
+    public override func validate(html: String, url: URL) throws {
         guard html.range(of: "<b>Born:</b>", options: .caseInsensitive) != nil else {
             let id = url.queryValue(for: "id") ?? url.lastPathComponent
             throw ScraperError.notAPersonPage(id)
         }
-
-        return try parsePage(html: html, sourceURL: url)
     }
 
     // MARK: - Page parsing
 
-    private func parsePage(html: String, sourceURL: URL) throws -> PersonData {
+    public override func parsePage(html: String, sourceURL: URL,
+                                   options: ScrapeOptions, verbose: Bool) throws -> PersonData {
         var person = PersonData()
         person.wikiURL = sourceURL.absoluteString
 
@@ -86,8 +76,14 @@ public struct BritRoyalsScraper: PersonPageScraper {
             person.wikiExtract = paragraphs.joined(separator: "\n\n")
         }
 
-        // ── Portrait / signature image ────────────────────────────────────
-        if let imgURL = extractFirstImage(from: html, baseURL: sourceURL) {
+        // ── Timeline events ───────────────────────────────────────────────
+        person.customEvents.append(contentsOf: extractTimeline(from: html))
+
+        // ── Portrait image ────────────────────────────────────────────────
+        // Use a BritRoyals-specific finder: skip signature images, site logos,
+        // SVG icons, and data URIs.  The portrait is typically the first
+        // content image in the `images/` directory that is not a signature.
+        if let imgURL = extractPortrait(from: html, baseURL: sourceURL) {
             person.imageURL = imgURL
         }
 
@@ -161,100 +157,145 @@ public struct BritRoyalsScraper: PersonPageScraper {
         }
     }
 
-    // MARK: - HTML helpers
+    // MARK: - Portrait extraction
 
-    private func extractTagContent(tag: String, from html: String) -> String? {
-        guard let regex = try? NSRegularExpression(
-                  pattern: "<\(tag)[^>]*>(.*?)</\(tag)>",
-                  options: [.dotMatchesLineSeparators, .caseInsensitive]),
-              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-              let r = Range(match.range(at: 1), in: html)
+    /// Find the person's portrait image, skipping signatures, logos, and icons.
+    ///
+    /// BritRoyals pages follow a pattern where:
+    /// - Portrait:   `images/{id}.jpg`  (or a subdirectory like `images/kings/{id}.jpg`)
+    /// - Signature:  `images/signature/{id}_sig.jpg`
+    ///
+    /// We scan every `<img>` and `<amp-img>` src and return the first one that
+    /// looks like a content image rather than chrome.
+    private func extractPortrait(from html: String, baseURL: URL) -> String? {
+        let pattern = #"<(?:amp-img|img)\s[^>]*src=['"]([^'"]+)['"]"#
+        guard let regex = try? NSRegularExpression(pattern: pattern,
+                                                    options: .caseInsensitive)
         else { return nil }
-        return String(html[r])
-    }
 
-    /// Parses all `<b>KEY:</b> VALUE` pairs from the biography block.
-    private func extractBoldFields(from html: String) -> [(key: String, value: String)] {
-        guard let regex = try? NSRegularExpression(
-                  pattern: #"<b>([^<:]+):</b>\s*(.*?)(?=<b>[^<:]+:|<p>|<!--|\z)"#,
-                  options: [.dotMatchesLineSeparators, .caseInsensitive])
-        else { return [] }
-
-        var results: [(String, String)] = []
-        for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
-            guard let kr = Range(match.range(at: 1), in: html),
-                  let vr = Range(match.range(at: 2), in: html) else { continue }
-            let key   = stripHTML(String(html[kr])).trimmingCharacters(in: .whitespacesAndNewlines)
-            let value = stripHTML(String(html[vr])).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !key.isEmpty && !value.isEmpty { results.append((key, value)) }
-        }
-        return results
-    }
-
-    private func extractParagraphs(from html: String) -> [String] {
-        guard let regex = try? NSRegularExpression(
-                  pattern: "<p>(.*?)</p>",
-                  options: [.dotMatchesLineSeparators, .caseInsensitive])
-        else { return [] }
-        var result: [String] = []
         for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
             guard let r = Range(match.range(at: 1), in: html) else { continue }
-            let text = stripHTML(String(html[r])).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty { result.append(text) }
+            let src   = String(html[r])
+            let lower = src.lowercased()
+
+            // Skip clearly non-portrait candidates
+            guard !lower.contains("/signature/"),
+                  !lower.contains("logo"),
+                  !lower.contains("icon"),
+                  !lower.hasSuffix(".svg"),
+                  !lower.hasPrefix("data:")
+            else { continue }
+
+            // Must be in an images/ path, or an absolute URL
+            guard lower.contains("images/") || lower.hasPrefix("http") || lower.hasPrefix("//")
+            else { continue }
+
+            if src.hasPrefix("http") { return src }
+            if src.hasPrefix("//")   { return "https:" + src }
+            return URL(string: src, relativeTo: baseURL)?.absoluteString
         }
-        return result
+        return nil
     }
 
-    private func extractFirstImage(from html: String, baseURL: URL) -> String? {
-        let pattern = #"<(?:amp-img|img)\s[^>]*src=['"]([^'"]+)['"]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-              let r = Range(match.range(at: 1), in: html)
-        else { return nil }
-        let src = String(html[r])
-        if src.hasPrefix("http") { return src }
-        return URL(string: src, relativeTo: baseURL)?.absoluteString
-    }
+    // MARK: - Timeline parsing
 
-    private func stripHTML(_ s: String) -> String {
-        var t = s.replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
-        let entities: [(String, String)] = [
-            ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
-            ("&nbsp;", " "), ("&#160;", " "), ("&#8212;", "—"),
-        ]
-        for (e, r) in entities { t = t.replacingOccurrences(of: e, with: r) }
-        t = t.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-        return t.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    /// Extract chronological events from the Year/Event table present on most BritRoyals pages.
+    ///
+    /// The table uses `<th>Year</th><th>Event</th>` headers followed by `<tr><td>YYYY</td><td>…</td></tr>`
+    /// data rows.  Each row becomes a `CustomEvent` whose type is inferred from the description text;
+    /// anything that doesn't match a known genealogical event type is filed as "Historical Event".
+    private func extractTimeline(from html: String) -> [CustomEvent] {
+        // Find the table that has both "Year" and "Event" as <th> headers.
+        guard let tableRegex = try? NSRegularExpression(
+                  pattern: #"<table[^>]*>(.*?)</table>"#,
+                  options: [.dotMatchesLineSeparators, .caseInsensitive])
+        else { return [] }
 
-    // MARK: - Date / place helpers
-
-    /// "December 6, 1421 at Windsor Castle" → (date, "Windsor Castle")
-    private func parseDatePlace(_ s: String) -> (date: GEDCOMDate?, place: String?) {
-        let cleaned = s
-            .replacingOccurrences(of: #",\s*aged\s+[\w\s,]+"#, with: "",
-                                  options: [.regularExpression, .caseInsensitive])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = cleaned.components(separatedBy: " at ")
-        let place: String? = parts.count > 1
-            ? parts[1].trimmingCharacters(in: .whitespaces)
-            : nil
-        return (DateParser.parse(parts[0].trimmingCharacters(in: .whitespaces)),
-                place?.isEmpty == true ? nil : place)
-    }
-
-    /// "May 21, 1471 at Tower of London (murdered), aged 49…" → (date, place, cause)
-    private func parseDatePlaceCause(_ s: String) -> (date: GEDCOMDate?, place: String?, cause: String?) {
-        var str = s
-        var cause: String? = nil
-        if let r = str.range(of: #"\([^)]+\)"#, options: .regularExpression) {
-            let inner = String(str[r]).dropFirst().dropLast()
-            let c = inner.trimmingCharacters(in: .whitespaces)
-            if !c.isEmpty { cause = c }
-            str = str.replacingCharacters(in: r, with: "").trimmingCharacters(in: .whitespaces)
+        var timelineHTML: String? = nil
+        for match in tableRegex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let r = Range(match.range(at: 1), in: html) else { continue }
+            let candidate = String(html[r])
+            if candidate.range(of: #"<th[^>]*>\s*Year\s*</th>"#,
+                               options: [.regularExpression, .caseInsensitive]) != nil,
+               candidate.range(of: #"<th[^>]*>\s*Event\s*</th>"#,
+                               options: [.regularExpression, .caseInsensitive]) != nil {
+                timelineHTML = candidate
+                break
+            }
         }
-        let (date, place) = parseDatePlace(str)
-        return (date, place, cause)
+        guard let tableBody = timelineHTML else { return [] }
+
+        // Parse each <tr> that contains exactly two <td> cells.
+        guard let rowRegex = try? NSRegularExpression(
+                  pattern: #"<tr[^>]*>(.*?)</tr>"#,
+                  options: [.dotMatchesLineSeparators, .caseInsensitive]),
+              let cellRegex = try? NSRegularExpression(
+                  pattern: #"<td[^>]*>(.*?)</td>"#,
+                  options: [.dotMatchesLineSeparators, .caseInsensitive])
+        else { return [] }
+
+        var events: [CustomEvent] = []
+
+        for rowMatch in rowRegex.matches(in: tableBody, range: NSRange(tableBody.startIndex..., in: tableBody)) {
+            guard let rr = Range(rowMatch.range(at: 1), in: tableBody) else { continue }
+            let rowHTML = String(tableBody[rr])
+
+            // Skip header rows
+            if rowHTML.range(of: "<th", options: .caseInsensitive) != nil { continue }
+
+            var cells: [String] = []
+            for cellMatch in cellRegex.matches(in: rowHTML, range: NSRange(rowHTML.startIndex..., in: rowHTML)) {
+                guard let cr = Range(cellMatch.range(at: 1), in: rowHTML) else { continue }
+                let text = stripHTML(String(rowHTML[cr])).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { cells.append(text) }
+            }
+            guard cells.count >= 2 else { continue }
+
+            let yearText   = cells[0]
+            let description = cells[1]
+            let date       = DateParser.parse(yearText)
+            let type       = classifyTimelineEvent(description)
+
+            events.append(CustomEvent(type: type, date: date, note: description))
+        }
+
+        return events
+    }
+
+    /// Map a timeline event description to a GEDCOM event type.
+    ///
+    /// Recognisable types use standard genealogical labels; anything that
+    /// doesn't fit a known category is filed as "Historical Event".
+    private func classifyTimelineEvent(_ description: String) -> String {
+        let s = description.lowercased()
+
+        if s.contains("accede") || s.contains("accedes") || s.contains("accession")
+                || s.contains("ascend") || s.contains("ascends to the throne")
+                || s.contains("succeed") || s.contains("succeeds to the throne") {
+            return "Accession"
+        }
+        if s.contains("coronat") || s.contains("crowned") {
+            return "Coronation"
+        }
+        if s.contains("marri") || s.contains("betrothed") || s.contains("wed ") || s.contains("weds") {
+            return "Marriage"
+        }
+        if s.contains("battle of") || s.contains("siege of") || s.contains("besieg")
+                || s.contains("crusade") || s.contains("invasion") || s.contains("invades")
+                || s.contains("rebellion") || s.contains("revolt") {
+            return "Battle"
+        }
+        if s.contains("treaty") || s.contains("truce") || s.contains("peace of") {
+            return "Treaty"
+        }
+        if s.contains("murder") || s.contains("assassinat") || s.contains("executed") {
+            return "Murder"
+        }
+        if s.contains("canoniz") || s.contains("canonised") || s.contains("beatif") {
+            return "Canonization"
+        }
+
+        return "Historical Event"
     }
 
     // MARK: - Name splitting

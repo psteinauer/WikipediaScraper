@@ -9,39 +9,50 @@ struct WikipediaScraper: AsyncParsableCommand {
 
     static var configuration = CommandConfiguration(
         commandName: "WikipediaScraper",
-        abstract: "Convert one or more Wikipedia person pages to a GEDCOM 7.0 genealogy file.",
+        abstract: "Convert one or more person pages to a GEDCOM 7.0 genealogy file.",
         discussion: """
-        Fetches the Quick Facts / infobox section of each Wikipedia article and
-        produces a standards-compliant GEDCOM 7.0 file importable into Mac Family
-        Tree 11 and other genealogy applications.
+        Fetches biographical data from supported person pages and produces a
+        standards-compliant GEDCOM 7.0 file importable into Mac Family Tree 11
+        and other genealogy applications.
+
+        SUPPORTED SOURCES
+          Wikipedia    https://en.wikipedia.org/wiki/<Article>
+                       Full infobox parsing, article sections, image downloads,
+                       and optional Claude AI enrichment.
+          BritRoyals   https://www.britroyals.com/kings.asp?id=<id>
+                       Biographical fields, portraits, and biography text.
 
         OUTPUT MODES (mutually exclusive)
-          Default      Writes <ArticleTitle>.ged to the current directory.
+          Default      Writes <Title>.ged to the current directory.
                        Multiple URLs: writes <First>_et_al.ged.
           --preflight  Writes GEDCOM to standard output for inspection.
           --zip        Writes a GEDZIP archive (.zip by default; use --output
                        to specify .gdz or any other extension) containing the
                        .ged file and any referenced media (portrait images).
-          --mappings   Prints a field-mapping table per URL; no GEDCOM is produced.
+          --mappings   Prints a Wikipedia infobox field-mapping table per URL;
+                       no GEDCOM is produced. (Wikipedia URLs only.)
 
         EXTRA CONTENT FLAGS
-          --notes      Appends each Wikipedia article section as a separate NOTE
-                       record on the individual (can be combined with any mode).
+          --notes      Appends article text sections as NOTE records on the
+                       individual (can be combined with any mode).
           --allimages  Downloads every article image into the GEDZIP archive and
                        links each as an OBJE record. Implies --zip.
+                       (Wikipedia URLs only.)
           --llm        Uses Claude AI to enrich the output with additional names,
                        titles, facts, events, and influential people (ASSO records).
                        Requires ANTHROPIC_API_KEY env var or --api-key.
+                       (Wikipedia URLs only.)
           --summary    Prints a human-readable summary of all exported data
                        (names, dates, titles, family, facts) to standard output.
 
         GEDZIP STRUCTURE (.zip / .gdz)
           gedcom.ged          GEDCOM 7 file (FILE tags use relative paths)
-          media/<title>.jpg   Portrait image downloaded from Wikimedia
+          media/<title>.jpg   Portrait image
           media/<file>.jpg    Additional images (--allimages)
 
         EXAMPLES
           WikipediaScraper https://en.wikipedia.org/wiki/George_Washington
+          WikipediaScraper https://www.britroyals.com/kings.asp?id=henry6
           WikipediaScraper --output presidents/washington.ged \\
               https://en.wikipedia.org/wiki/George_Washington
           WikipediaScraper --zip https://en.wikipedia.org/wiki/Elizabeth_II
@@ -53,15 +64,15 @@ struct WikipediaScraper: AsyncParsableCommand {
           WikipediaScraper --verbose --zip https://en.wikipedia.org/wiki/Napoleon
           WikipediaScraper --zip \\
               https://en.wikipedia.org/wiki/Queen_Victoria \\
-              https://en.wikipedia.org/wiki/Prince_Albert
+              https://www.britroyals.com/queens.asp?id=victoria
         """,
         version: "1.5.0"
     )
 
     // MARK: - Arguments & options
 
-    @Argument(help: "One or more full URLs of Wikipedia articles.")
-    var wikipediaURLs: [String]
+    @Argument(help: "One or more URLs of person pages to scrape.")
+    var urls: [String]
 
     @Option(name: .shortAndLong,
             help: "Override the output file path (default: <ArticleTitle>.ged or .gdz in CWD).")
@@ -118,8 +129,8 @@ struct WikipediaScraper: AsyncParsableCommand {
     // MARK: - Validation
 
     func validate() throws {
-        if wikipediaURLs.isEmpty {
-            throw ValidationError("At least one Wikipedia URL is required.")
+        if urls.isEmpty {
+            throw ValidationError("At least one URL is required.")
         }
         let modes = [preflight, zip, mappings].filter { $0 }.count
         if modes > 1 {
@@ -153,12 +164,12 @@ struct WikipediaScraper: AsyncParsableCommand {
         var mediaFiles: [(path: String, data: Data)] = []
         var firstPageTitle: String?
 
-        for (index, wikipediaURL) in wikipediaURLs.enumerated() {
+        for (index, pageURLString) in urls.enumerated() {
 
-            let urlLabel = wikipediaURLs.count > 1 ? "[\(index + 1)/\(wikipediaURLs.count)] " : ""
+            let urlLabel = urls.count > 1 ? "[\(index + 1)/\(urls.count)] " : ""
 
-            guard let pageURL = URL(string: wikipediaURL) else {
-                fputs("Error: Invalid URL '\(wikipediaURL)'\n", stderr)
+            guard let pageURL = URL(string: pageURLString) else {
+                fputs("Error: Invalid URL '\(pageURLString)'\n", stderr)
                 throw ExitCode.failure
             }
 
@@ -167,7 +178,7 @@ struct WikipediaScraper: AsyncParsableCommand {
 
                 // ── 1. Resolve page title ──────────────────────────────────
                 if verbose { fputs("\(urlLabel)Resolving page title…\n", stderr) }
-                let pageTitle = try WikipediaClient.pageTitle(from: wikipediaURL)
+                let pageTitle = try WikipediaClient.pageTitle(from: pageURLString)
                 if verbose { fputs("\(urlLabel)Page title: \(pageTitle)\n", stderr) }
                 if firstPageTitle == nil { firstPageTitle = pageTitle }
 
@@ -192,7 +203,7 @@ struct WikipediaScraper: AsyncParsableCommand {
                                                               pageTitle: pageTitle,
                                                               verbose: verbose,
                                                               config: config)
-                person.wikiURL     = wikipediaURL
+                person.wikiURL     = pageURLString
                 person.wikiTitle   = summary.title
                 person.wikiExtract = summary.extract
 
@@ -231,7 +242,7 @@ struct WikipediaScraper: AsyncParsableCommand {
                 if mappings {
                     let report = MappingsReporter.report(person: person,
                                                          rawFields: rawFields,
-                                                         wikiURL: wikipediaURL)
+                                                         wikiURL: pageURLString)
                     print(report, terminator: "")
                     continue
                 }
@@ -309,7 +320,7 @@ struct WikipediaScraper: AsyncParsableCommand {
             } else {
                 // ── Non-Wikipedia URLs: generic scraper path ───────────────
                 guard let scraper = ScraperRegistry.scraper(for: pageURL) else {
-                    fputs("Error: No scraper available for '\(wikipediaURL)'\n", stderr)
+                    fputs("Error: No scraper available for '\(pageURLString)'\n", stderr)
                     throw ExitCode.failure
                 }
 
@@ -443,6 +454,15 @@ struct WikipediaScraper: AsyncParsableCommand {
             }
         }
 
+        // ── Merge duplicate records for the same person ───────────────────
+        // When two URLs (e.g. Wikipedia + BritRoyals) describe the same individual,
+        // collapse them into a single PersonData combining data from both sources.
+        let beforeMerge = persons.count
+        persons = PersonMerger.mergeDuplicates(in: persons)
+        if verbose && persons.count < beforeMerge {
+            fputs("Merged \(beforeMerge - persons.count) duplicate person record(s).\n", stderr)
+        }
+
         guard !persons.isEmpty else { return }
 
         // ── When --nopeople, strip all refs to people not on the command line ─
@@ -529,7 +549,7 @@ struct WikipediaScraper: AsyncParsableCommand {
         // ── 8. Summary (--summary) ────────────────────────────────────────
         if summary {
             // Only summarise the primary persons (not stubs fetched as refs)
-            let primaryCount = wikipediaURLs.count
+            let primaryCount = urls.count
             let primaryPersons = Array(persons.prefix(primaryCount))
             print(buildSummary(persons: primaryPersons))
         }

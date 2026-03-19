@@ -58,11 +58,61 @@ private struct ChipFlowLayout: Layout {
     }
 }
 
+// MARK: - Person row view
+//
+// Keeping .onDrag on the entire row competes with the List's click-to-select
+// gesture on macOS — the drag recognizer can eat the mouseDown and prevent
+// selection.  Moving the drag to a dedicated handle icon (shown on hover)
+// gives .onDrag a tiny hit-target so normal clicks on the rest of the row
+// always reach the List's selection handler.
+
+private struct PersonRowView: View {
+    let person:       EditablePerson
+    let displayName:  String
+    let dragProvider: () -> NSItemProvider
+
+    @State private var isHovered = false
+
+    var body: some View {
+        if person.isStub {
+            Label {
+                Text(displayName).foregroundStyle(.secondary)
+            } icon: {
+                Image(systemName: "person.badge.clock").foregroundStyle(.tertiary)
+            }
+        } else {
+            Label {
+                HStack(spacing: 0) {
+                    Text(displayName)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    Spacer(minLength: 0)
+                    // Drag handle — visible on hover, not a tap target for selection.
+                    Image(systemName: "arrow.up.doc")
+                        .imageScale(.small)
+                        .foregroundStyle(.tertiary)
+                        .opacity(isHovered ? 1 : 0)
+                        .padding(.leading, 6)
+                        .onDrag { dragProvider() }
+                }
+            } icon: {
+                Image(systemName: "person.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+            }
+            .onHover { isHovered = $0 }
+        }
+    }
+}
+
 // MARK: - Content view
 
 struct ContentView: View {
     @StateObject private var vm = PersonViewModel()
     @State private var sidebarTab: SidebarTab = .people
+    // Local selection for List — @State so SwiftUI's reconciliation never writes to a
+    // @Published property during the view update pass (which causes "Publishing changes
+    // from within view updates" warnings).  Kept in sync with vm.selectedPersonID via onChange.
+    @State private var selectedPersonID: UUID? = nil
     @State private var selectedSourceID: UUID? = nil
     @State private var showingAddURL    = false
     @State private var showingSettings  = false
@@ -356,10 +406,27 @@ struct ContentView: View {
     // MARK: - People list
 
     private var peopleList: some View {
-        List(vm.persons, selection: $vm.selectedPersonID) { person in
-            personRow(person)
+        List(vm.persons, selection: $selectedPersonID) { person in
+            PersonRowView(
+                person:       person,
+                displayName:  personDisplayName(person),
+                dragProvider: { vm.dragItemProvider(for: person) }
+            )
         }
         .listStyle(.sidebar)
+        // Sync local @State selection → VM.  This runs after the view update pass,
+        // so mutating vm.selectedPersonID here does NOT cause "Publishing" warnings.
+        // If the list clears selection (macOS re-click, or data change removing the
+        // selected item), restore to the first non-stub person.
+        .onChange(of: selectedPersonID) { newID in
+            let resolved = newID ?? vm.persons.first(where: { !$0.isStub })?.id
+            if vm.selectedPersonID != resolved { vm.selectedPersonID = resolved }
+        }
+        // Sync VM → local selection so programmatic selection (after fetch, merge,
+        // rebuildStubs) is reflected in the List.
+        .onChange(of: vm.selectedPersonID) { newID in
+            if selectedPersonID != newID { selectedPersonID = newID }
+        }
         .contextMenu(forSelectionType: UUID.self) { ids in
             if let id = ids.first {
                 Button(role: .destructive) {
@@ -380,28 +447,6 @@ struct ContentView: View {
                         .foregroundStyle(.tertiary)
                 }
                 .allowsHitTesting(false)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func personRow(_ person: EditablePerson) -> some View {
-        let name = personDisplayName(person)
-        if person.isStub {
-            Label {
-                Text(name).foregroundStyle(.secondary)
-            } icon: {
-                Image(systemName: "person.badge.clock").foregroundStyle(.tertiary)
-            }
-        } else {
-            Label {
-                Text(name)
-            } icon: {
-                Image(systemName: person.sex == .female ? "person.circle.fill" : "person.circle")
-                    .foregroundStyle(Color.accentColor)
-            }
-            .onDrag {
-                vm.dragItemProvider(for: person)
             }
         }
     }
@@ -441,8 +486,18 @@ struct ContentView: View {
     private var detailContent: some View {
         switch sidebarTab {
         case .people:
-            if let binding = vm.selectedPersonBinding() {
-                PersonEditorView(person: binding)
+            if let id = selectedPersonID,
+               vm.persons.contains(where: { $0.id == id }) {
+                // Build the binding directly from the local selection so the detail view
+                // updates in the same render pass as the sidebar, with no one-frame lag.
+                PersonEditorView(person: Binding(
+                    get: { vm.persons.first(where: { $0.id == id }) ?? EditablePerson() },
+                    set: { newValue in
+                        if let i = vm.persons.firstIndex(where: { $0.id == id }) {
+                            vm.persons[i] = newValue
+                        }
+                    }
+                ))
             } else {
                 emptyPeopleState
             }
@@ -528,7 +583,7 @@ struct ContentView: View {
     private var detailTitle: String {
         switch sidebarTab {
         case .people:
-            if let id = vm.selectedPersonID,
+            if let id = selectedPersonID,
                let p = vm.persons.first(where: { $0.id == id }),
                !personDisplayName(p).isEmpty {
                 return personDisplayName(p)

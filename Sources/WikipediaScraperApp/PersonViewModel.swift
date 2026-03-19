@@ -32,8 +32,10 @@ final class PersonViewModel: ObservableObject {
     }
     @Published var noPeople: Bool = false {
         didSet {
-            rebuildStubs()
             UserDefaults.standard.set(noPeople, forKey: "fetch_no_people")
+            // Defer the persons mutation so it doesn't fire objectWillChange
+            // while SwiftUI is still processing the noPeople binding change.
+            Task { @MainActor [weak self] in self?.rebuildStubs() }
         }
     }
 
@@ -174,6 +176,14 @@ final class PersonViewModel: ObservableObject {
         }
 
         persons = full + stubs
+
+        // If the current selection is gone (e.g. a selected stub was rebuilt
+        // with a new UUID), fall back to the first non-stub person.
+        if let id = selectedPersonID, !persons.contains(where: { $0.id == id }) {
+            selectedPersonID = full.first?.id
+        } else if selectedPersonID == nil {
+            selectedPersonID = full.first?.id
+        }
     }
 
     // MARK: - Remove person
@@ -215,7 +225,7 @@ final class PersonViewModel: ObservableObject {
         }
 
         statusMessage = nil
-        rebuildStubs()
+        Task { @MainActor [weak self] in self?.rebuildStubs() }
     }
 
     private func fetchOne(_ fetchURL: String, index: Int, total: Int) async throws {
@@ -239,12 +249,42 @@ final class PersonViewModel: ObservableObject {
         let personData = try await scraper.scrape(url: url, options: options, verbose: false)
         var editable   = EditablePerson(from: personData)
 
-        // Replace matching entry (including stubs) or append
+        // 1. Exact wikiTitle match (same source revisited / refresh)
         if let idx = persons.firstIndex(where: {
             !$0.wikiTitle.isEmpty && $0.wikiTitle == editable.wikiTitle
         }) {
-            editable.id    = persons[idx].id
-            persons[idx]   = editable
+            editable.id  = persons[idx].id
+            persons[idx] = editable
+            selectedPersonID = editable.id
+            return
+        }
+
+        // 2. Same-person match across sources (e.g. Wikipedia + BritRoyals)
+        if let idx = persons.firstIndex(where: { existing in
+            !existing.isStub &&
+            PersonMerger.areSamePerson(existing.toPersonData(), personData)
+        }) {
+            let existingData = persons[idx].toPersonData()
+            // Prefer Wikipedia as primary; BritRoyals fills gaps
+            let merged: PersonData
+            if personData.wikiURL?.contains("wikipedia.org") == true {
+                merged = PersonMerger.merge(personData, with: existingData)
+            } else {
+                merged = PersonMerger.merge(existingData, with: personData)
+            }
+            var mergedEditable   = EditablePerson(from: merged)
+            mergedEditable.id    = persons[idx].id
+            persons[idx]         = mergedEditable
+            selectedPersonID     = mergedEditable.id
+            return
+        }
+
+        // 3. Replace a stub with the same name, or append
+        if let idx = persons.firstIndex(where: {
+            $0.isStub && !$0.wikiTitle.isEmpty && $0.wikiTitle == editable.wikiTitle
+        }) {
+            editable.id  = persons[idx].id
+            persons[idx] = editable
         } else {
             persons.append(editable)
         }
@@ -266,7 +306,7 @@ final class PersonViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         statusMessage = nil
-        rebuildStubs()
+        Task { @MainActor [weak self] in self?.rebuildStubs() }
     }
 
     // MARK: - AI Analysis

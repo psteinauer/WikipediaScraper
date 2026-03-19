@@ -189,7 +189,13 @@ public struct MediaThumbnail: View {
         }
         phase = .loading
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            // Send a Referer header matching the image's own origin so that
+            // sites with hotlink protection (e.g. britroyals.com) serve the image.
+            var request = URLRequest(url: url)
+            if let origin = url.host.map({ "\(url.scheme ?? "https")://\($0)" }) {
+                request.setValue(origin, forHTTPHeaderField: "Referer")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
             // Guard against cancellation after the await resumes.
             try Task.checkCancellation()
             if let http = response as? HTTPURLResponse,

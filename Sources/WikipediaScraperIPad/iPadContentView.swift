@@ -50,6 +50,10 @@ struct iPadContentView: View {
     @State private var showingSettings = false
     @State private var showingAddURL = false
     @State private var sidebarTab: SidebarTab = .people
+    // Local selection for List — @State so SwiftUI's reconciliation never writes to a
+    // @Published property during the view update pass (which causes "Publishing changes
+    // from within view updates" warnings).
+    @State private var selectedPersonID: UUID? = nil
     @State private var selectedSourceID: UUID? = nil
 
     enum SidebarTab: String, CaseIterable {
@@ -226,10 +230,17 @@ struct iPadContentView: View {
     // MARK: - People List
 
     private var peopleList: some View {
-        List(vm.persons, selection: $vm.selectedPersonID) { person in
+        List(vm.persons, selection: $selectedPersonID) { person in
             personRow(person)
         }
         .listStyle(.sidebar)
+        .onChange(of: selectedPersonID) { newID in
+            let resolved = newID ?? vm.persons.first(where: { !$0.isStub })?.id
+            if vm.selectedPersonID != resolved { vm.selectedPersonID = resolved }
+        }
+        .onChange(of: vm.selectedPersonID) { newID in
+            if selectedPersonID != newID { selectedPersonID = newID }
+        }
         .overlay {
             if vm.persons.isEmpty {
                 Text("No people yet")
@@ -279,10 +290,18 @@ struct iPadContentView: View {
     private var detailContent: some View {
         switch sidebarTab {
         case .people:
-            if let binding = vm.selectedPersonBinding() {
+            if let id = selectedPersonID,
+               vm.persons.contains(where: { $0.id == id }) {
                 ScrollView {
-                    PersonEditorView(person: binding)
-                        .padding(.vertical, 8)
+                    PersonEditorView(person: Binding(
+                        get: { vm.persons.first(where: { $0.id == id }) ?? EditablePerson() },
+                        set: { newValue in
+                            if let i = vm.persons.firstIndex(where: { $0.id == id }) {
+                                vm.persons[i] = newValue
+                            }
+                        }
+                    ))
+                    .padding(.vertical, 8)
                 }
             } else {
                 emptyPeopleState
@@ -346,7 +365,7 @@ struct iPadContentView: View {
     private var detailTitle: String {
         switch sidebarTab {
         case .people:
-            if let id = vm.selectedPersonID,
+            if let id = selectedPersonID,
                let p = vm.persons.first(where: { $0.id == id }) {
                 return personDisplayName(p)
             }

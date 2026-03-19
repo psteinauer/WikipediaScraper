@@ -72,8 +72,8 @@ final class iPadPersonViewModel: ObservableObject {
     }
     @Published var noPeople: Bool = false {
         didSet {
-            rebuildStubs()
             UserDefaults.standard.set(noPeople, forKey: "fetch_no_people")
+            Task { @MainActor [weak self] in self?.rebuildStubs() }
         }
     }
 
@@ -209,6 +209,14 @@ final class iPadPersonViewModel: ObservableObject {
         }
 
         persons = full + stubs
+
+        // If the current selection is gone (e.g. a selected stub was rebuilt
+        // with a new UUID), fall back to the first non-stub person.
+        if let id = selectedPersonID, !persons.contains(where: { $0.id == id }) {
+            selectedPersonID = full.first?.id
+        } else if selectedPersonID == nil {
+            selectedPersonID = full.first?.id
+        }
     }
 
     func removePerson(id: UUID) {
@@ -245,7 +253,7 @@ final class iPadPersonViewModel: ObservableObject {
         }
 
         statusMessage = nil
-        rebuildStubs()
+        Task { @MainActor [weak self] in self?.rebuildStubs() }
     }
 
     private func fetchOne(_ fetchURL: String, index: Int, total: Int) async throws {
@@ -324,7 +332,7 @@ final class iPadPersonViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         statusMessage = nil
-        rebuildStubs()
+        Task { @MainActor [weak self] in self?.rebuildStubs() }
     }
 
     // MARK: - AI Analysis

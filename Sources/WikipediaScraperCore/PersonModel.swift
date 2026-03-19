@@ -187,9 +187,11 @@ public struct PersonData {
     public var additionalMedia: [AdditionalMedia] = []
 
     // ── Source ────────────────────────────────────────────────────────────
-    public var wikiURL:     String?
-    public var wikiTitle:   String?
-    public var wikiExtract: String?
+    public var wikiURL:              String?
+    public var wikiTitle:            String?
+    public var wikiExtract:          String?
+    /// Additional source URLs added when two records for the same person are merged.
+    public var additionalSourceURLs: [String] = []
 
     // ── Wikipedia article sections (--notes) ──────────────────────────────
     public var wikiSections: [(title: String, text: String)] = []

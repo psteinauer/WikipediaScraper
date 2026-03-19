@@ -1,7 +1,12 @@
 // PersonPageScraper.swift — Protocol and global registry for person-page scrapers
 //
-// To add support for a new website:
-//   1. Create `struct MyScraper: PersonPageScraper` in a new file in WikipediaScraperCore
+// To add support for a new HTML-based website:
+//   1. Create `final class MyScraper: BaseHTMLScraper` in a new file in WikipediaScraperCore
+//      (inherit HTML utilities, date helpers, and the default scrape() flow for free)
+//   2. Add it to the `entries` array in `ScraperRegistry` below
+//
+// To add support for a non-HTML website (e.g. a JSON API or wikitext source):
+//   1. Create `struct MyScraper: PersonPageScraper` (or subclass another base class)
 //   2. Add it to the `entries` array in `ScraperRegistry` below
 
 import Foundation
