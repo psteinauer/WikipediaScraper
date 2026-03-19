@@ -159,42 +159,70 @@ public final class BritRoyalsScraper: BaseHTMLScraper {
 
     // MARK: - Portrait extraction
 
-    /// Find the person's portrait image, skipping signatures, logos, and icons.
+    /// Find the person's portrait image, skipping signatures, logos, and navigation chrome.
     ///
-    /// BritRoyals pages follow a pattern where:
-    /// - Portrait:   `images/{id}.jpg`  (or a subdirectory like `images/kings/{id}.jpg`)
-    /// - Signature:  `images/signature/{id}_sig.jpg`
-    ///
-    /// We scan every `<img>` and `<amp-img>` src and return the first one that
-    /// looks like a content image rather than chrome.
+    /// BritRoyals pages mark the article portrait with `class='c-article__image'` on the
+    /// `<amp-img>` element.  We scan every opening tag, capture its full attribute string,
+    /// and prefer any tag carrying that class.  If no such tag exists we fall back to the
+    /// first content image (skipping .gif/.svg, menus, arrows, signatures, and icons).
     private func extractPortrait(from html: String, baseURL: URL) -> String? {
-        let pattern = #"<(?:amp-img|img)\s[^>]*src=['"]([^'"]+)['"]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern,
-                                                    options: .caseInsensitive)
+        // Match the full attribute string of every <amp-img> or <img> opening tag.
+        guard let tagRegex = try? NSRegularExpression(
+                  pattern: #"<(?:amp-img|img)(\s[^>]*?)(?:>|/>)"#,
+                  options: .caseInsensitive),
+              let srcRegex = try? NSRegularExpression(
+                  pattern: #"\bsrc=['"]([^'"]+)['"]"#,
+                  options: .caseInsensitive)
         else { return nil }
 
-        for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
-            guard let r = Range(match.range(at: 1), in: html) else { continue }
-            let src   = String(html[r])
-            let lower = src.lowercased()
+        var fallback: String? = nil
 
-            // Skip clearly non-portrait candidates
-            guard !lower.contains("/signature/"),
-                  !lower.contains("logo"),
-                  !lower.contains("icon"),
-                  !lower.hasSuffix(".svg"),
-                  !lower.hasPrefix("data:")
+        for tagMatch in tagRegex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            guard let attrRange = Range(tagMatch.range(at: 1), in: html) else { continue }
+            let attrs      = String(html[attrRange])
+            let attrsLower = attrs.lowercased()
+
+            // Extract src= value from this tag's attributes.
+            guard let srcMatch = srcRegex.firstMatch(in: attrs,
+                                                     range: NSRange(attrs.startIndex..., in: attrs)),
+                  let srcRange = Range(srcMatch.range(at: 1), in: attrs)
+            else { continue }
+            let src      = String(attrs[srcRange])
+            let srcLower = src.lowercased()
+
+            // Skip definitively non-portrait sources.
+            guard !srcLower.contains("/signature/"),
+                  !srcLower.contains("logo"),
+                  !srcLower.hasSuffix(".svg"),
+                  !srcLower.hasPrefix("data:")
             else { continue }
 
-            // Must be in an images/ path, or an absolute URL
-            guard lower.contains("images/") || lower.hasPrefix("http") || lower.hasPrefix("//")
+            // Must live in an images/ path or be an absolute URL.
+            guard srcLower.contains("images/") || srcLower.hasPrefix("http") || srcLower.hasPrefix("//")
             else { continue }
 
-            if src.hasPrefix("http") { return src }
-            if src.hasPrefix("//")   { return "https:" + src }
-            return URL(string: src, relativeTo: baseURL)?.absoluteString
+            // Primary pick: the article portrait is tagged with c-article__image.
+            if attrsLower.contains("c-article__image") {
+                return resolveImageURL(src, baseURL: baseURL)
+            }
+
+            // Fallback: skip obvious UI chrome (menus, arrows, close buttons, tiny gifs).
+            guard !srcLower.contains("menu"),
+                  !srcLower.contains("arrow"),
+                  !srcLower.contains("close"),
+                  !srcLower.contains("icon"),
+                  !srcLower.hasSuffix(".gif")
+            else { continue }
+
+            if fallback == nil { fallback = resolveImageURL(src, baseURL: baseURL) }
         }
-        return nil
+        return fallback
+    }
+
+    private func resolveImageURL(_ src: String, baseURL: URL) -> String? {
+        if src.hasPrefix("http") { return src }
+        if src.hasPrefix("//")   { return "https:" + src }
+        return URL(string: src, relativeTo: baseURL)?.absoluteString
     }
 
     // MARK: - Timeline parsing
