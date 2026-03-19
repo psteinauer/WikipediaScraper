@@ -526,6 +526,68 @@ private struct SubGroup<Content: View>: View {
     }
 }
 
+// MARK: - GenderPicker
+//
+// Custom segmented control that tints the Male segment pale blue and the
+// Female segment pale pink while keeping Unknown in the neutral system style.
+// SwiftUI's built-in Picker(.segmented) offers no per-segment colour API.
+
+private struct GenderPicker: View {
+    @Binding var selection: Sex
+
+    private struct Segment {
+        let value:         Sex
+        let label:         String
+        let selectedTint:  Color   // nil-ish → use neutral system tint
+    }
+
+    private let segments: [Segment] = [
+        Segment(value: .unknown, label: "Unknown", selectedTint: Color.primary.opacity(0.12)),
+        Segment(value: .male,    label: "Male",    selectedTint: Color.blue.opacity(0.20)),
+        Segment(value: .female,  label: "Female",  selectedTint: Color.pink.opacity(0.22)),
+    ]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(segments, id: \.value) { seg in
+                Button { selection = seg.value } label: {
+                    Text(seg.label)
+                        .font(.callout)
+                        .fontWeight(selection == seg.value ? .medium : .regular)
+                        .foregroundStyle(Color.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .background(
+                            selection == seg.value ? seg.selectedTint : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                if seg.value != segments.last?.value {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.10))
+                        .frame(width: 0.5)
+                        .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding(3)
+        .background(containerColor)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+        }
+    }
+
+    #if os(macOS)
+    private var containerColor: Color { Color(NSColor.controlColor) }
+    #else
+    private var containerColor: Color { Color(UIColor.tertiarySystemFill) }
+    #endif
+}
+
 // MARK: - MediaGrid (unified: primary first with star, then additional)
 
 private struct MediaGrid: View {
@@ -694,15 +756,9 @@ public struct PersonEditorView: View {
             }
             FieldRow("Given Name") { TextField("Given name(s)", text: $person.givenName) }
             FieldRow("Surname")    { TextField("Family name",   text: $person.surname) }
-            FieldRow("Sex", showDivider: false) {
-                Picker("", selection: $person.sex) {
-                    Text("Unknown").tag(Sex.unknown)
-                    Text("Male").tag(Sex.male)
-                    Text("Female").tag(Sex.female)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 240)
+            FieldRow("Gender", showDivider: false) {
+                GenderPicker(selection: $person.sex)
+                    .frame(maxWidth: 240)
             }
         }
     }
