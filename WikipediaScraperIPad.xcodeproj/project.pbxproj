@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -14,7 +14,7 @@
 		AA000001000000000000005E /* WikipediaScraperCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000005F /* WikipediaScraperCore */; };
 		AA000001000000000000006E /* WikipediaScraperSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001000000000000006F /* WikipediaScraperSharedUI */; };
 		AB000001000000000000001E /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB000001000000000000001F /* ShareViewController.swift */; };
-		AB0000010000000000000070 /* WikipediaToGEDCOMShare.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AB000001000000000000008F /* WikipediaToGEDCOMShare.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AB0000010000000000000070 /* WikipediaToGEDCOMShareIPad.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AB000001000000000000008F /* WikipediaToGEDCOMShareIPad.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,7 +23,7 @@
 			containerPortal = AA00000100000000000000F0 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = AB00000100000000000000D0;
-			remoteInfo = WikipediaToGEDCOMShare;
+			remoteInfo = WikipediaToGEDCOMShareIPad;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -34,7 +34,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				AB0000010000000000000070 /* WikipediaToGEDCOMShare.appex in Embed App Extensions */,
+				AB0000010000000000000070 /* WikipediaToGEDCOMShareIPad.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -50,7 +50,7 @@
 		AA000001000000000000008F /* WikipediaScraperIPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WikipediaScraperIPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB000001000000000000001F /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		AB000001000000000000007F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		AB000001000000000000008F /* WikipediaToGEDCOMShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WikipediaToGEDCOMShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AB000001000000000000008F /* WikipediaToGEDCOMShareIPad.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WikipediaToGEDCOMShareIPad.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,16 +73,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AA00000100000000000000C0 /* root */ = {
+		AA00000100000000000000C0 = {
 			isa = PBXGroup;
 			children = (
-				AA00000100000000000000C1 /* WikipediaScraperIPad */,
-				AB00000100000000000000C1 /* WikipediaToGEDCOMShare */,
+				AA00000100000000000000C1 /* Sources/WikipediaScraperIPad */,
+				AB00000100000000000000C1 /* Sources/WikipediaToGEDCOMShare */,
 				AA00000100000000000000C2 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		AA00000100000000000000C1 /* WikipediaScraperIPad */ = {
+		AA00000100000000000000C1 /* Sources/WikipediaScraperIPad */ = {
 			isa = PBXGroup;
 			children = (
 				AA000001000000000000001F /* WikipediaScraperIPadApp.swift */,
@@ -98,12 +98,12 @@
 			isa = PBXGroup;
 			children = (
 				AA000001000000000000008F /* WikipediaScraperIPad.app */,
-				AB000001000000000000008F /* WikipediaToGEDCOMShare.appex */,
+				AB000001000000000000008F /* WikipediaToGEDCOMShareIPad.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AB00000100000000000000C1 /* WikipediaToGEDCOMShare */ = {
+		AB00000100000000000000C1 /* Sources/WikipediaToGEDCOMShare */ = {
 			isa = PBXGroup;
 			children = (
 				AB000001000000000000001F /* ShareViewController.swift */,
@@ -138,9 +138,9 @@
 			productReference = AA000001000000000000008F /* WikipediaScraperIPad.app */;
 			productType = "com.apple.product-type.application";
 		};
-		AB00000100000000000000D0 /* WikipediaToGEDCOMShare */ = {
+		AB00000100000000000000D0 /* WikipediaToGEDCOMShareIPad */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AB00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShare" */;
+			buildConfigurationList = AB00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShareIPad" */;
 			buildPhases = (
 				AB00000100000000000000B1 /* Frameworks */,
 				AB00000100000000000000B2 /* Sources */,
@@ -150,11 +150,11 @@
 			);
 			dependencies = (
 			);
-			name = WikipediaToGEDCOMShare;
+			name = WikipediaToGEDCOMShareIPad;
 			packageProductDependencies = (
 			);
-			productName = WikipediaToGEDCOMShare;
-			productReference = AB000001000000000000008F /* WikipediaToGEDCOMShare.appex */;
+			productName = WikipediaToGEDCOMShareIPad;
+			productReference = AB000001000000000000008F /* WikipediaToGEDCOMShareIPad.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -192,7 +192,7 @@
 			projectRoot = "";
 			targets = (
 				AA00000100000000000000D0 /* WikipediaScraperIPad */,
-				AB00000100000000000000D0 /* WikipediaToGEDCOMShare */,
+				AB00000100000000000000D0 /* WikipediaToGEDCOMShareIPad */,
 			);
 		};
 /* End PBXProject section */
@@ -239,7 +239,7 @@
 /* Begin PBXTargetDependency section */
 		AB00000100000000000000D1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = AB00000100000000000000D0 /* WikipediaToGEDCOMShare */;
+			target = AB00000100000000000000D0 /* WikipediaToGEDCOMShareIPad */;
 			targetProxy = AB00000100000000000000D2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -250,15 +250,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = WikipediaScraperIPad.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YD533JVX8N;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Sources/WikipediaScraperIPad/Info.plist";
+				INFOPLIST_FILE = Sources/WikipediaScraperIPad/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = "1.0";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.psteinauer.WikipediaToGEDCOM.iPad";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPad;
 				PRODUCT_NAME = WikipediaScraperIPad;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
@@ -274,12 +273,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = UATYMH5SM8;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Sources/WikipediaScraperIPad/Info.plist";
+				INFOPLIST_FILE = Sources/WikipediaScraperIPad/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = "1.0";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.psteinauer.WikipediaToGEDCOM.iPad";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPad;
 				PRODUCT_NAME = WikipediaScraperIPad;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
@@ -403,16 +402,15 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = WikipediaToGEDCOMShare.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YD533JVX8N;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Sources/WikipediaToGEDCOMShare/Info.plist";
+				INFOPLIST_FILE = Sources/WikipediaToGEDCOMShare/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = "1.0";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.psteinauer.WikipediaToGEDCOM.iPad.ShareExtension";
-				PRODUCT_NAME = WikipediaToGEDCOMShare;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPad.ShareExtension;
+				PRODUCT_NAME = WikipediaToGEDCOMShareIPad;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
@@ -426,13 +424,13 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YD533JVX8N;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = "Sources/WikipediaToGEDCOMShare/Info.plist";
+				INFOPLIST_FILE = Sources/WikipediaToGEDCOMShare/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = "1.0";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.psteinauer.WikipediaToGEDCOM.iPad.ShareExtension";
-				PRODUCT_NAME = WikipediaToGEDCOMShare;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPad.ShareExtension;
+				PRODUCT_NAME = WikipediaToGEDCOMShareIPad;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
@@ -462,7 +460,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AB00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShare" */ = {
+		AB00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShareIPad" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AB00000100000000000000E1 /* Debug */,
@@ -476,7 +474,7 @@
 /* Begin XCLocalSwiftPackageReference section */
 		AA00000100000000000000A0 /* XCLocalSwiftPackageReference "." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ".";
+			relativePath = .;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -492,7 +490,6 @@
 			productName = WikipediaScraperSharedUI;
 		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = AA00000100000000000000F0 /* Project object */;
 }

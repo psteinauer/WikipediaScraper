@@ -25,10 +25,18 @@ final class PersonViewModel: ObservableObject {
 
     // Per-session fetch options — persisted across launches
     @Published var useNotes: Bool = false {
-        didSet { UserDefaults.standard.set(useNotes, forKey: "fetch_use_notes") }
+        didSet {
+            UserDefaults.standard.set(useNotes, forKey: "fetch_use_notes")
+            guard hasData, !isLoading else { return }
+            Task { await self.fetch() }
+        }
     }
     @Published var useAllImages: Bool = false {
-        didSet { UserDefaults.standard.set(useAllImages, forKey: "fetch_use_all_images") }
+        didSet {
+            UserDefaults.standard.set(useAllImages, forKey: "fetch_use_all_images")
+            guard hasData, !isLoading else { return }
+            Task { await self.fetch() }
+        }
     }
     @Published var noPeople: Bool = false {
         didSet {
@@ -189,9 +197,18 @@ final class PersonViewModel: ObservableObject {
     // MARK: - Remove person
 
     func removePerson(id: UUID) {
+        guard let person = persons.first(where: { $0.id == id }) else { return }
+        if !person.wikiURL.isEmpty {
+            urls.removeAll { $0 == person.wikiURL }
+        }
         persons.removeAll { $0.id == id }
         if selectedPersonID == id { selectedPersonID = persons.first(where: { !$0.isStub })?.id }
-        rebuildStubs()
+        if !urls.isEmpty {
+            Task { await fetch() }
+        } else {
+            persons.removeAll()
+            selectedPersonID = nil
+        }
     }
 
     // MARK: - Fetch

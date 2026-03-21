@@ -1,0 +1,492 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AF000001000000000000001E /* WikipediaScraperIPhoneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF000001000000000000001F /* WikipediaScraperIPhoneApp.swift */; };
+		AF000001000000000000002E /* iPhoneContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF000001000000000000002F /* iPhoneContentView.swift */; };
+		AF000001000000000000003E /* iPhonePersonViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF000001000000000000003F /* iPhonePersonViewModel.swift */; };
+		AF000001000000000000004E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AF000001000000000000004F /* Assets.xcassets */; };
+		AF000001000000000000005E /* WikipediaScraperCore in Frameworks */ = {isa = PBXBuildFile; productRef = AF000001000000000000005F /* WikipediaScraperCore */; };
+		AF000001000000000000006E /* WikipediaScraperSharedUI in Frameworks */ = {isa = PBXBuildFile; productRef = AF000001000000000000006F /* WikipediaScraperSharedUI */; };
+		AF000002000000000000001E /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF000002000000000000001F /* ShareViewController.swift */; };
+		AF000002000000000000009E /* WikipediaToGEDCOMShareIPhone.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AF000002000000000000008F /* WikipediaToGEDCOMShareIPhone.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AF00000200000000000000C3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AF00000100000000000000F0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AF00000200000000000000D0;
+			remoteInfo = WikipediaToGEDCOMShareIPhone;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AF00000200000000000000B4 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AF000002000000000000009E /* WikipediaToGEDCOMShareIPhone.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		AF000001000000000000001F /* WikipediaScraperIPhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WikipediaScraperIPhoneApp.swift; sourceTree = "<group>"; };
+		AF000001000000000000002F /* iPhoneContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPhoneContentView.swift; sourceTree = "<group>"; };
+		AF000001000000000000003F /* iPhonePersonViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPhonePersonViewModel.swift; sourceTree = "<group>"; };
+		AF000001000000000000004F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AF000001000000000000007F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AF000001000000000000008F /* WikipediaScraperIPhone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WikipediaScraperIPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF000002000000000000001F /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		AF000002000000000000002F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AF000002000000000000008F /* WikipediaToGEDCOMShareIPhone.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WikipediaToGEDCOMShareIPhone.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AF00000100000000000000B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000001000000000000005E /* WikipediaScraperCore in Frameworks */,
+				AF000001000000000000006E /* WikipediaScraperSharedUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF00000200000000000000B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AF00000100000000000000C0 = {
+			isa = PBXGroup;
+			children = (
+				AF00000100000000000000C1 /* Sources/WikipediaScraperIPhone */,
+				AF00000200000000000000C1 /* Sources/WikipediaToGEDCOMShareIPhone */,
+				AF00000100000000000000C2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AF00000100000000000000C1 /* Sources/WikipediaScraperIPhone */ = {
+			isa = PBXGroup;
+			children = (
+				AF000001000000000000001F /* WikipediaScraperIPhoneApp.swift */,
+				AF000001000000000000002F /* iPhoneContentView.swift */,
+				AF000001000000000000003F /* iPhonePersonViewModel.swift */,
+				AF000001000000000000004F /* Assets.xcassets */,
+				AF000001000000000000007F /* Info.plist */,
+			);
+			path = Sources/WikipediaScraperIPhone;
+			sourceTree = "<group>";
+		};
+		AF00000100000000000000C2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AF000001000000000000008F /* WikipediaScraperIPhone.app */,
+				AF000002000000000000008F /* WikipediaToGEDCOMShareIPhone.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AF00000200000000000000C1 /* Sources/WikipediaToGEDCOMShareIPhone */ = {
+			isa = PBXGroup;
+			children = (
+				AF000002000000000000001F /* ShareViewController.swift */,
+				AF000002000000000000002F /* Info.plist */,
+			);
+			path = Sources/WikipediaToGEDCOMShareIPhone;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AF00000100000000000000D0 /* WikipediaScraperIPhone */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaScraperIPhone" */;
+			buildPhases = (
+				AF00000100000000000000B1 /* Frameworks */,
+				AF00000100000000000000B2 /* Sources */,
+				AF00000100000000000000B3 /* Resources */,
+				AF00000200000000000000B4 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AF00000200000000000000C4 /* PBXTargetDependency */,
+			);
+			name = WikipediaScraperIPhone;
+			packageProductDependencies = (
+				AF000001000000000000005F /* WikipediaScraperCore */,
+				AF000001000000000000006F /* WikipediaScraperSharedUI */,
+			);
+			productName = WikipediaScraperIPhone;
+			productReference = AF000001000000000000008F /* WikipediaScraperIPhone.app */;
+			productType = "com.apple.product-type.application";
+		};
+		AF00000200000000000000D0 /* WikipediaToGEDCOMShareIPhone */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF00000200000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShareIPhone" */;
+			buildPhases = (
+				AF00000200000000000000B1 /* Frameworks */,
+				AF00000200000000000000B2 /* Sources */,
+				AF00000200000000000000B3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WikipediaToGEDCOMShareIPhone;
+			productName = WikipediaToGEDCOMShareIPhone;
+			productReference = AF000002000000000000008F /* WikipediaToGEDCOMShareIPhone.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AF00000100000000000000F0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					AF00000100000000000000D0 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					AF00000200000000000000D0 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = AF00000100000000000000F1 /* Build configuration list for PBXProject "WikipediaScraperIPhone" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AF00000100000000000000C0;
+			packageReferences = (
+				AF00000100000000000000A0 /* XCLocalSwiftPackageReference "." */,
+			);
+			productRefGroup = AF00000100000000000000C2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AF00000100000000000000D0 /* WikipediaScraperIPhone */,
+				AF00000200000000000000D0 /* WikipediaToGEDCOMShareIPhone */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AF00000100000000000000B3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000001000000000000004E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF00000200000000000000B3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AF00000100000000000000B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000001000000000000001E /* WikipediaScraperIPhoneApp.swift in Sources */,
+				AF000001000000000000002E /* iPhoneContentView.swift in Sources */,
+				AF000001000000000000003E /* iPhonePersonViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF00000200000000000000B2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AF000002000000000000001E /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AF00000200000000000000C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AF00000200000000000000D0 /* WikipediaToGEDCOMShareIPhone */;
+			targetProxy = AF00000200000000000000C3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AF00000100000000000000E1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = WikipediaScraperIPhone.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YD533JVX8N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/WikipediaScraperIPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPhone;
+				PRODUCT_NAME = WikipediaScraperIPhone;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AF00000100000000000000E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YD533JVX8N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/WikipediaScraperIPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPhone;
+				PRODUCT_NAME = WikipediaScraperIPhone;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		AF00000100000000000000F2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_IVAR_ACCESS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_DECL = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AF00000100000000000000F3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_IVAR_ACCESS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_DECL = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		AF00000200000000000000E1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WikipediaToGEDCOMShareIPhone.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YD533JVX8N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/WikipediaToGEDCOMShareIPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPhone.ShareExtension;
+				PRODUCT_NAME = WikipediaToGEDCOMShareIPhone;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AF00000200000000000000E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = WikipediaToGEDCOMShareIPhone.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YD533JVX8N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/WikipediaToGEDCOMShareIPhone/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.psteinauer.WikipediaToGEDCOM.iPhone.ShareExtension;
+				PRODUCT_NAME = WikipediaToGEDCOMShareIPhone;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AF00000100000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaScraperIPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF00000100000000000000E1 /* Debug */,
+				AF00000100000000000000E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF00000100000000000000F1 /* Build configuration list for PBXProject "WikipediaScraperIPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF00000100000000000000F2 /* Debug */,
+				AF00000100000000000000F3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF00000200000000000000E0 /* Build configuration list for PBXNativeTarget "WikipediaToGEDCOMShareIPhone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF00000200000000000000E1 /* Debug */,
+				AF00000200000000000000E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AF00000100000000000000A0 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AF000001000000000000005F /* WikipediaScraperCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF00000100000000000000A0 /* XCLocalSwiftPackageReference "." */;
+			productName = WikipediaScraperCore;
+		};
+		AF000001000000000000006F /* WikipediaScraperSharedUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AF00000100000000000000A0 /* XCLocalSwiftPackageReference "." */;
+			productName = WikipediaScraperSharedUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AF00000100000000000000F0 /* Project object */;
+}

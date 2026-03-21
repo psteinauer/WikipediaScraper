@@ -3,10 +3,10 @@ import SwiftUI
 import UserNotifications
 
 @main
-struct WikipediaScraperIPadApp: App {
+struct WikipediaScraperIPhoneApp: App {
     var body: some Scene {
         WindowGroup {
-            iPadContentView()
+            iPhoneContentView()
                 .task {
                     _ = try? await UNUserNotificationCenter.current()
                         .requestAuthorization(options: [.alert, .sound])
@@ -20,7 +20,7 @@ struct WikipediaScraperIPadApp: App {
 // macOS compilation stub — provides the required entry point so
 // `swift build` succeeds on macOS. Never actually runs on macOS.
 @main
-struct WikipediaScraperIPadApp {
+struct WikipediaScraperIPhoneApp {
     static func main() {}
 }
 

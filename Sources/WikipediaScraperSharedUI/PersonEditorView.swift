@@ -555,6 +555,8 @@ private struct GenderPicker: View {
                         .font(.callout)
                         .fontWeight(selection == seg.value ? .medium : .regular)
                         .foregroundStyle(Color.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                         .background(
@@ -632,6 +634,10 @@ public struct PersonEditorView: View {
     /// default so the image is visible on the very first render.
     @State private var nameCardHeight: CGFloat = 160
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
     private static let topLevelSections = [
         "Name and Gender", "Events", "Facts", "Additional Names",
         "Media", "Notes", "Sources", "Other"
@@ -695,23 +701,50 @@ public struct PersonEditorView: View {
         )
     }
 
+    /// Portrait thumbnail alongside (or above) the name/gender card.
+    /// On compact-width screens (iPhone) the image sits above the card;
+    /// on regular-width screens (iPad, Mac) it sits to the right.
+    @ViewBuilder
+    private var nameAndGenderWithPortrait: some View {
+        let showPortrait = !person.imageURL.isEmpty && expandedSections.contains("Name and Gender")
+        let card = nameAndGenderSection
+            .overlay {
+                GeometryReader { geo in
+                    Color.clear.onAppear { nameCardHeight = geo.size.height }
+                }
+            }
+
+        #if os(iOS)
+        if horizontalSizeClass == .compact {
+            VStack(alignment: .leading, spacing: 8) {
+                if showPortrait {
+                    MediaThumbnail(urlString: person.imageURL, height: 160)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                card
+            }
+        } else {
+            HStack(alignment: .top, spacing: 12) {
+                card
+                if showPortrait {
+                    MediaThumbnail(urlString: person.imageURL, height: nameCardHeight)
+                }
+            }
+        }
+        #else
+        HStack(alignment: .top, spacing: 12) {
+            card
+            if showPortrait {
+                MediaThumbnail(urlString: person.imageURL, height: nameCardHeight)
+            }
+        }
+        #endif
+    }
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    nameAndGenderSection
-                        .overlay {
-                            GeometryReader { geo in
-                                Color.clear.onAppear {
-                                    nameCardHeight = geo.size.height
-                                }
-                            }
-                        }
-                    if !person.imageURL.isEmpty
-                        && expandedSections.contains("Name and Gender") {
-                        MediaThumbnail(urlString: person.imageURL, height: nameCardHeight)
-                    }
-                }
+                nameAndGenderWithPortrait
                 eventsSection
                 factsSection
                 additionalNamesSection

@@ -7,7 +7,7 @@ import WikipediaScraperSharedUI
 
 // MARK: - FileDocument types
 
-struct GEDCOMDocument: FileDocument {
+struct iPhoneGEDCOMDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.plainText] }
     var content: String
 
@@ -25,7 +25,7 @@ struct GEDCOMDocument: FileDocument {
     }
 }
 
-struct ZIPDocument: FileDocument {
+struct iPhoneZIPDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.zip] }
     var data: Data
 
@@ -43,7 +43,7 @@ struct ZIPDocument: FileDocument {
 // MARK: - ViewModel
 
 @MainActor
-final class iPadPersonViewModel: ObservableObject {
+final class iPhonePersonViewModel: ObservableObject {
     @Published var urls: [String] = [] {
         didSet { UserDefaults.standard.set(urls, forKey: "url_list") }
     }
@@ -58,8 +58,8 @@ final class iPadPersonViewModel: ObservableObject {
     @Published var isAnalyzing: Bool = false
 
     // Export state
-    @Published var gedDocument  = GEDCOMDocument()
-    @Published var zipDocument  = ZIPDocument()
+    @Published var gedDocument  = iPhoneGEDCOMDocument()
+    @Published var zipDocument  = iPhoneZIPDocument()
     @Published var isExportingGED: Bool = false
     @Published var isExportingZip: Bool = false
 
@@ -125,11 +125,8 @@ final class iPadPersonViewModel: ObservableObject {
 
     var hasData: Bool { persons.contains { !$0.isStub } }
 
-    // MARK: - Person access
-
-    func selectedPersonBinding() -> Binding<EditablePerson>? {
-        guard let id = selectedPersonID,
-              persons.contains(where: { $0.id == id }) else { return nil }
+    func personBinding(for id: UUID) -> Binding<EditablePerson>? {
+        guard persons.contains(where: { $0.id == id }) else { return nil }
         return Binding(
             get: { self.persons.first(where: { $0.id == id }) ?? EditablePerson() },
             set: { newValue in
@@ -229,8 +226,6 @@ final class iPadPersonViewModel: ObservableObject {
 
         persons = full + stubs
 
-        // If the current selection is gone (e.g. a selected stub was rebuilt
-        // with a new UUID), fall back to the first non-stub person.
         if let id = selectedPersonID, !persons.contains(where: { $0.id == id }) {
             selectedPersonID = full.first?.id
         } else if selectedPersonID == nil {
@@ -309,7 +304,6 @@ final class iPadPersonViewModel: ObservableObject {
             ?? summary.thumbnail?.source
             ?? editable.imageURL
 
-        // ── Notes ─────────────────────────────────────────────────────────
         if useNotes {
             statusMessage = multi ? "Fetching sections (\(index + 1)/\(total))…" : "Fetching article sections…"
             do {
@@ -318,7 +312,6 @@ final class iPadPersonViewModel: ObservableObject {
             } catch { /* non-fatal */ }
         }
 
-        // ── All images ─────────────────────────────────────────────────────
         if useAllImages {
             statusMessage = multi ? "Fetching images (\(index + 1)/\(total))…" : "Fetching image list…"
             do {
@@ -339,7 +332,6 @@ final class iPadPersonViewModel: ObservableObject {
             } catch { /* non-fatal */ }
         }
 
-        // Replace matching entry (including stubs) or append
         if let idx = persons.firstIndex(where: {
             !$0.wikiTitle.isEmpty && $0.wikiTitle == editable.wikiTitle
         }) {
@@ -425,7 +417,7 @@ final class iPadPersonViewModel: ObservableObject {
         var personDatas = persons.filter { !$0.isStub }.map { $0.toPersonData() }
         if noPeople { personDatas = personDatas.map { var p = $0; stripFamilyRefs(&p); return p } }
         var builder    = GEDCOMBuilder()
-        gedDocument    = GEDCOMDocument(content: builder.build(persons: personDatas, verbose: false))
+        gedDocument    = iPhoneGEDCOMDocument(content: builder.build(persons: personDatas, verbose: false))
         isExportingGED = true
     }
 
@@ -438,7 +430,7 @@ final class iPadPersonViewModel: ObservableObject {
             try await buildAndWriteZip(to: tempURL)
             let rawData = try Data(contentsOf: tempURL)
             try? FileManager.default.removeItem(at: tempURL)
-            zipDocument    = ZIPDocument(data: rawData)
+            zipDocument    = iPhoneZIPDocument(data: rawData)
             isExportingZip = true
         } catch {
             statusMessage = "Error building ZIP: \(error.localizedDescription)"
@@ -482,8 +474,6 @@ final class iPadPersonViewModel: ObservableObject {
         let gedcom  = builder.build(persons: personDatas, verbose: false)
         try GEDZIPBuilder.create(gedcom: gedcom, mediaFiles: mediaFiles, at: url)
     }
-
-    // MARK: - Export result handler
 
     func handleExportResult(_ result: Result<URL, Error>) {
         switch result {

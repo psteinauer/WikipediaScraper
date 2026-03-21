@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>WikipediaScraperIPad</string>
+    <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
     <string>com.psteinauer.WikipediaToGEDCOM.iPad</string>
     <key>CFBundleName</key>
@@ -20,9 +20,7 @@
     <string>AppIcon</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
-    <key>UIRequiresFullScreen</key>
-    <false/>
-    <key>UISupportedInterfaceOrientations~ipad</key>
+<key>UISupportedInterfaceOrientations~ipad</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
         <string>UIInterfaceOrientationPortraitUpsideDown</string>

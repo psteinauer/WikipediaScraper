@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 private let appGroupSuite = "group.com.psteinauer.WikipediaToGEDCOM"
 private let pendingURLKey  = "pending_share_url"
 
-/// iPadOS Share Extension view controller.
+/// iPhone Share Extension view controller.
 ///
 /// Mirrors the macOS extension UX: shows the resolved URL with Add/Cancel
 /// buttons. Tapping Add opens the host app via `wikipedia-gedcom://add?url=…`
