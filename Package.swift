@@ -61,6 +61,17 @@ let package = Package(
             ]
         ),
 
+        // iOS SwiftUI app (iPhone)
+        .executableTarget(
+            name: "WikipediaScraperIPhone",
+            dependencies: ["WikipediaScraperCore", "WikipediaScraperSharedUI"],
+            path: "Sources/WikipediaScraperIPhone",
+            exclude: ["Info.plist"],
+            resources: [
+                .process("Assets.xcassets"),
+            ]
+        ),
+
         .testTarget(
             name: "WikipediaScraperTests",
             dependencies: ["WikipediaScraperCore"],

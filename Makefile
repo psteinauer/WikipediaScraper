@@ -12,18 +12,21 @@
 WORKSPACE        = WikipediaScraper.xcworkspace
 MAC_SCHEME       = Wikipedia to GEDCOM (macOS)
 IPAD_SCHEME      = Wikipedia to GEDCOM (iPadOS)
+IPHONE_SCHEME    = WikipediaScraperIPhone
 CLI_SCHEME       = WikipediaScraper CLI
 BUILD_ALL_SCHEME = Build All
 
-CLI_BINARY       = WikipediaScraper
-IPAD_BUNDLE_ID   = com.psteinauer.WikipediaToGEDCOM.iPad
-IPAD_SIM_NAME   ?= iPad Pro 13-inch (M5)
+CLI_BINARY        = WikipediaScraper
+IPAD_BUNDLE_ID    = com.psteinauer.WikipediaToGEDCOM.iPad
+IPHONE_BUNDLE_ID  = com.psteinauer.WikipediaToGEDCOM.iPhone
+IPAD_SIM_NAME    ?= iPad Pro 13-inch (M5)
+IPHONE_SIM_NAME  ?= iPhone 17 Pro
 INSTALL_PREFIX  ?= /usr/local/bin
 
 BUILD_DIR        = ./build
 
 .PHONY: all build release install app app-release ipad ipad-sim ipad-sim-reset \
-        icons clean xcode test test-unit
+        iphone-sim icons clean xcode test test-unit
 
 # ── All targets ───────────────────────────────────────────────────────────────
 
@@ -40,6 +43,7 @@ all:
 	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Debug \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 	    build
 	@echo "=== CLI tool ==="
 	swift build --product $(CLI_BINARY)
@@ -80,12 +84,14 @@ app:
 	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Debug \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 	    build 2>&1 | xcpretty 2>/dev/null || \
 	xcrun xcodebuild \
 	    -workspace "$(WORKSPACE)" \
 	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Debug \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 	    build
 	@echo ""
 	@echo "✓  $(BUILD_DIR)/Build/Products/Debug/WikipediaScraperApp.app"
@@ -100,12 +106,14 @@ app-release:
 	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Release \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 	    build 2>&1 | xcpretty 2>/dev/null || \
 	xcrun xcodebuild \
 	    -workspace "$(WORKSPACE)" \
 	    -scheme "$(MAC_SCHEME)" \
 	    -configuration Release \
 	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 	    build
 	@echo ""
 	@echo "✓  $(BUILD_DIR)/Build/Products/Release/WikipediaScraperApp.app"
@@ -150,6 +158,37 @@ ipad-sim:
 	   xcrun simctl launch "$$SIM_ID" "$(IPAD_BUNDLE_ID)"; \
 	 else \
 	   echo "  (no booted '$(IPAD_SIM_NAME)' simulator — boot one first, or use: make xcode)"; \
+	 fi
+
+## Build iOS app for the iPhone simulator (Debug), then install and launch
+##   Set IPHONE_SIM_NAME=<name> to target a different simulator device
+iphone-sim:
+	@echo "→ Building '$(IPHONE_SCHEME)' for simulator '$(IPHONE_SIM_NAME)'…"
+	xcrun xcodebuild \
+	    -workspace "$(WORKSPACE)" \
+	    -scheme "$(IPHONE_SCHEME)" \
+	    -destination "platform=iOS Simulator,name=$(IPHONE_SIM_NAME)" \
+	    -configuration Debug \
+	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+	    build 2>&1 | xcpretty 2>/dev/null || \
+	xcrun xcodebuild \
+	    -workspace "$(WORKSPACE)" \
+	    -scheme "$(IPHONE_SCHEME)" \
+	    -destination "platform=iOS Simulator,name=$(IPHONE_SIM_NAME)" \
+	    -configuration Debug \
+	    -derivedDataPath "$(BUILD_DIR)" \
+	    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+	    build
+	@SIM_ID=$$(xcrun simctl list devices available | grep "$(IPHONE_SIM_NAME)" | grep Booted | grep -Eo '[A-F0-9-]{36}' | head -1); \
+	 APP=$$(find "$(BUILD_DIR)/Build/Products" -name "WikipediaScraperIPhone.app" -maxdepth 4 | head -1); \
+	 if [ -n "$$SIM_ID" ] && [ -n "$$APP" ]; then \
+	   echo "→ Installing on simulator $$SIM_ID…"; \
+	   xcrun simctl install "$$SIM_ID" "$$APP"; \
+	   echo "→ Launching…"; \
+	   xcrun simctl launch "$$SIM_ID" "$(IPHONE_BUNDLE_ID)"; \
+	 else \
+	   echo "  (no booted '$(IPHONE_SIM_NAME)' simulator — boot one first, or use: make xcode)"; \
 	 fi
 
 ## Erase and reboot the iPad simulator (fixes stale-state crashes)
