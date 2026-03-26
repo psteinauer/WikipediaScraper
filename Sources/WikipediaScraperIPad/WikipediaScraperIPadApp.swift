@@ -1,16 +1,11 @@
 #if os(iOS)
 import SwiftUI
-import UserNotifications
 
 @main
 struct WikipediaScraperIPadApp: App {
     var body: some Scene {
         WindowGroup {
             iPadContentView()
-                .task {
-                    _ = try? await UNUserNotificationCenter.current()
-                        .requestAuthorization(options: [.alert, .sound])
-                }
         }
     }
 }

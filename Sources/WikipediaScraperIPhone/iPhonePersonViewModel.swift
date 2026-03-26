@@ -110,6 +110,16 @@ final class iPhonePersonViewModel: ObservableObject {
 
     func removeURL(_ urlString: String) {
         urls.removeAll { $0 == urlString }
+        persons.removeAll { $0.wikiURL == urlString }
+        if selectedPersonID.map({ id in !persons.contains(where: { $0.id == id }) }) == true {
+            selectedPersonID = persons.first(where: { !$0.isStub })?.id
+        }
+        guard !urls.isEmpty else {
+            persons.removeAll()
+            selectedPersonID = nil
+            return
+        }
+        Task { await fetch() }
     }
 
     /// Reads a URL left by the Share Extension in the App Group container and
